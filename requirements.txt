@@ -1,0 +1,7 @@
+requests
+Pillow
+fake-useragent
+playwright
+ddddocr
+pycryptodome
+beautifulsoup4
