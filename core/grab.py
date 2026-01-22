@@ -21,38 +21,95 @@ def load_config(path="config.json"):
         print(f"[-] 配置文件格式错误: {e}")
         return None
 
+def calibrate_time_offset(client):
+    """
+    NTP 对时：计算本地与服务器的时间偏移
+    
+    Returns:
+        float: 时间偏移（秒），正数表示本地慢，负数表示本地快
+    """
+    if not client:
+        return 0.0
+    
+    local_before = datetime.datetime.now()
+    server_time = client.get_server_datetime()
+    local_after = datetime.datetime.now()
+    
+    if server_time:
+        # 计算 RTT 并估算真实服务器时间
+        rtt = (local_after - local_before).total_seconds()
+        local_mid = local_before + datetime.timedelta(seconds=rtt/2)
+        
+        # 转换为无时区进行比较
+        server_naive = server_time.replace(tzinfo=None)
+        offset = (server_naive - local_mid).total_seconds()
+        
+        return offset
+    
+    return 0.0
+
+
 def wait_until(target_time_str, client=None, use_server_time=False):
-    """等待到指定时间"""
+    """
+    毫秒级精准等待
+    
+    优化策略:
+    1. NTP 对时：计算本地与服务器的时间偏移
+    2. 粗等待：剩余 > 2秒时用 time.sleep()
+    3. 精等待：剩余 < 2秒时用自旋锁 (CPU 空转)
+    """
     if not target_time_str:
         return
     
     try:
         now = datetime.datetime.now()
+        
+        # NTP 对时
+        time_offset = 0.0
         if use_server_time and client:
-            server_now = client.get_server_datetime()
-            if server_now:
-                now = server_now.replace(tzinfo=None)
-                print(f"[*] 当前服务器时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+            print("[*] 正在与服务器对时...")
+            time_offset = calibrate_time_offset(client)
+            if time_offset != 0:
+                print(f"[+] 时间偏移: {time_offset:+.3f} 秒 (本地{'快' if time_offset < 0 else '慢'})")
             else:
                 print("[-] 获取服务器时间失败，使用本地时间")
+        
+        # 解析目标时间
         target = datetime.datetime.strptime(target_time_str, "%H:%M:%S")
         target = now.replace(hour=target.hour, minute=target.minute, second=target.second, microsecond=0)
         
+        # 应用时间偏移：如果本地慢，需要提前触发
+        adjusted_target = target - datetime.timedelta(seconds=time_offset)
+        
         # 如果目标时间已过，跳过等待
-        if target <= now:
+        if adjusted_target <= now:
             print(f"[*] 目标时间 {target_time_str} 已过，立即开始")
             return
         
-        wait_seconds = (target - now).total_seconds()
-        print(f"[*] 等待到 {target_time_str} 开始抢号 (还需 {wait_seconds:.0f} 秒)")
+        wait_seconds = (adjusted_target - now).total_seconds()
+        print(f"[*] 等待到 {target_time_str} 开始抢号 (还需 {wait_seconds:.1f} 秒)")
         
-        # 每秒更新倒计时
-        while datetime.datetime.now() < target:
-            remaining = (target - datetime.datetime.now()).total_seconds()
-            if remaining > 0:
-                print(f"\r[*] 倒计时: {remaining:.1f} 秒", end="", flush=True)
-                time.sleep(min(1, remaining))
-        print("\n[*] 时间到，开始抢号!")
+        # 阶段1: 粗等待 (剩余 > 2秒时用 sleep)
+        while True:
+            remaining = (adjusted_target - datetime.datetime.now()).total_seconds()
+            if remaining <= 2.0:
+                break
+            print(f"\r[*] 倒计时: {remaining:.1f} 秒", end="", flush=True)
+            time.sleep(min(1.0, remaining - 2.0))
+        
+        print(f"\n[*] 进入精准等待模式 (自旋锁)...")
+        
+        # 阶段2: 精等待 (剩余 < 2秒时用自旋锁)
+        spin_start = datetime.datetime.now()
+        while datetime.datetime.now() < adjusted_target:
+            pass  # Busy-wait (自旋锁) - 占用 CPU 但精度高
+        
+        actual_time = datetime.datetime.now()
+        spin_duration = (actual_time - spin_start).total_seconds() * 1000
+        delay = (actual_time - adjusted_target).total_seconds() * 1000
+        
+        print(f"[+] 时间到! 自旋耗时: {spin_duration:.1f}ms, 触发延迟: {delay:+.1f}ms")
+        
     except ValueError:
         print(f"[-] 时间格式错误: {target_time_str}，应为 HH:MM:SS")
 

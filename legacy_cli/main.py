@@ -1,6 +1,7 @@
 from core.client import HealthClient
 import sys
 import json
+import os
 
 def select_from_list(items, display_func_or_keys, return_key=None):
     """通用的列表选择助手函数。支持 func 或 key_list"""
@@ -40,9 +41,30 @@ def main():
         print("[-] 登录失败，程序退出")
         return
 
-    # 2. 选择城市 (目前默认深圳)
-    city_id = 5 
-    print(f"\n[*] 当前城市: 深圳 (ID: {city_id})")
+    # 2. 选择城市
+    print("\n[*] 加载城市列表...")
+    cities = []
+    cities_file = os.path.join(os.path.dirname(__file__), 'cities.json')
+    try:
+        with open(cities_file, 'r', encoding='utf-8') as f:
+            cities = json.load(f)
+    except Exception as e:
+        print(f"[-] 城市列表加载失败: {e}, 使用默认深圳")
+        cities = [{'name': '深圳', 'cityId': '5'}]
+
+    city_filter = input("请输入城市名称关键字 (直接回车显示全部): ").strip()
+    if city_filter:
+        cities = [c for c in cities if city_filter in c.get('name', '')]
+
+    if not cities:
+        print("[-] 未找到匹配的城市")
+        return
+    
+    selected_city = select_from_list(cities, lambda x: x['name'])
+    if not selected_city:
+        return
+    city_id = selected_city.get('cityId', '5')
+    print(f"[+] 已选择城市: {selected_city['name']} (ID: {city_id})")
     
     # 3. 选择医院
     print("\n[*] 正在获取医院列表...")

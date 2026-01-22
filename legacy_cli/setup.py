@@ -78,9 +78,36 @@ def setup():
     config['member_name'] = member['name']
     print(f"[+] 已选择就诊人: {member['name']}")
     
-    # 2. 选择医院
+    # 2. 选择城市
+    print("\n[*] 加载城市列表...")
+    cities = []
+    cities_file = os.path.join(os.path.dirname(__file__), 'cities.json')
+    try:
+        with open(cities_file, 'r', encoding='utf-8') as f:
+            cities = json.load(f)
+    except Exception as e:
+        print(f"[-] 城市列表加载失败: {e}, 使用默认深圳")
+        cities = [{'name': '深圳', 'cityId': '5'}]
+
+    city_filter = input("请输入城市名称关键字 (直接回车显示全部): ").strip()
+    if city_filter:
+        cities = [c for c in cities if city_filter in c.get('name', '')]
+
+    if not cities:
+        print("[-] 未找到匹配的城市")
+        return
+    
+    selected_city = select_from_list(cities, lambda x: x['name'])
+    if not selected_city:
+        return
+    city_id = selected_city.get('cityId', '5')
+    config['city_id'] = city_id
+    config['city_name'] = selected_city['name']
+    print(f"[+] 已选择城市: {selected_city['name']} (ID: {city_id})")
+    
+    # 3. 选择医院
     print("\n[*] 正在获取医院列表...")
-    hospitals = client.get_hospitals_by_city()
+    hospitals = client.get_hospitals_by_city(city_id)
     if not hospitals:
         print("[-] 获取医院列表失败")
         return
@@ -103,7 +130,7 @@ def setup():
     config['unit_name'] = hospital.get('unit_name', hospital.get('name', ''))
     print(f"[+] 已选择: {config['unit_name']}")
     
-    # 2. 选择科室
+    # 4. 选择科室
     print("\n[*] 正在获取科室列表...")
     dep_categories = client.get_deps_by_unit(config['unit_id'])
     
@@ -134,7 +161,7 @@ def setup():
     config['dep_name'] = department.get('dep_name', department.get('name', ''))
     print(f"[+] 已选择: {config['dep_name']}")
     
-    # 3. 选择目标日期
+    # 5. 选择目标日期
     print("\n[*] 请选择目标日期 (可多选):")
     import datetime
     dates = []
@@ -151,7 +178,7 @@ def setup():
     config['target_dates'] = selected_dates
     print(f"[+] 已选择日期: {', '.join(selected_dates)}")
     
-    # 4. 选择医生 (可选)
+    # 6. 选择医生 (可选)
     print("\n[*] 正在获取医生列表...")
     docs = client.get_schedule(config['unit_id'], config['dep_id'], selected_dates[0])
     
@@ -174,7 +201,7 @@ def setup():
         config['doctor_names'] = []
         print("[*] 未指定医生，将抢任意有号医生")
     
-    # 5. 选择时段类型
+    # 7. 选择时段类型
     print("\n[*] 请选择目标时段:")
     print("[0] 上午 + 下午 (推荐)")
     print("[1] 仅上午")
@@ -187,12 +214,12 @@ def setup():
     else:
         config['time_types'] = ['am', 'pm']
     
-    # 6. 定时设置 (可选)
+    # 8. 定时设置 (可选)
     print("\n[*] 定时设置 (医院一般 00:00 或 06:00 放号)")
     start_time = input("输入开始抢号时间 (格式 HH:MM:SS，直接回车立即开始): ").strip()
     config['start_time'] = start_time
     
-    # 8. 其他设置
+    # 9. 其他设置
     config['retry_interval'] = 0.3  # 重试间隔 (秒)
     config['max_retries'] = 0  # 0 表示无限重试
     config['preferred_hours'] = []  # 优先时段
@@ -206,6 +233,7 @@ def setup():
     print("[SUCCESS] 配置已保存到 config.json")
     print(f"{'='*50}")
     print("\n配置摘要:")
+    print(f"  城市: {config.get('city_name', '未知')}")
     print(f"  医院: {config['unit_name']}")
     print(f"  科室: {config['dep_name']}")
     print(f"  日期: {', '.join(config['target_dates'])}")

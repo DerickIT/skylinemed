@@ -6,6 +6,7 @@ import hashlib
 import random
 import string
 import datetime
+import threading
 from email.utils import parsedate_to_datetime
 from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
@@ -28,6 +29,8 @@ class HealthClient:
         # 使用脚本所在目录的绝对路径，避免工作目录问题
         self.script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.cookie_file = os.path.join(self.script_dir, 'cookies.json')
+        self.last_error = None
+        self.last_status_code = None
         
         if self.load_cookies():
             print(f"[+] 本地 Cookie 加载成功: {self.cookie_file}")
@@ -136,7 +139,11 @@ class HealthClient:
                 return True
 
         except Exception as e:
-            print(f"[-] 浏览器登录失败: {e}")
+            error_msg = str(e)
+            if "executable doesn't exist" in error_msg or "Executable doesn't exist" in error_msg:
+                print("[-] Playwright 浏览器未安装！请运行: playwright install chromium")
+            else:
+                print(f"[-] 浏览器登录失败: {e}")
             return False
 
     def login(self):
@@ -250,8 +257,8 @@ class HealthClient:
         data = {
             'sch_data': params.get('sch_data'),
             'mid': params.get('member_id'),
-            'addressId': params.get('addressId', '3317'),
-            'address': params.get('address', 'Civic Center'),
+            'addressId': params.get('addressId', ''),
+            'address': params.get('address', ''),
             'disease_input': params.get('disease_input', '自动抢号'),
             'order_no': '',
             'disease_content': params.get('disease_content', '自动抢号'),
@@ -304,6 +311,8 @@ class HealthClient:
             return None
 
     def get_schedule(self, unit_id, dep_id, date=None):
+        self.last_error = None
+        self.last_status_code = None
         if not date: date = time.strftime("%Y-%m-%d")
         url = "https://gate.91160.com/guahao/v1/pc/sch/dep"
         
@@ -313,9 +322,10 @@ class HealthClient:
         for c in self.session.cookies:
             if c.name == 'access_hash':
                 user_keys.append(c.value)
-        user_keys = list(set(user_keys))
+        user_keys = list(set(user_keys))[-1:]  # 只保留最后一个有效 key，避免无效请求
         
         if not user_keys:
+            self.last_error = "未登录或缺少 access_hash"
             print("[-] 没有 access_hash")
             return []
 
@@ -334,7 +344,11 @@ class HealthClient:
             headers['Referer'] = 'https://www.91160.com/'
             
             try:
-                r = self.session.get(url, params=params, headers=headers)
+                r = self.session.get(url, params=params, headers=headers, timeout=10)
+                self.last_status_code = r.status_code
+                if r.status_code != 200:
+                    self.last_error = f"排班接口 HTTP {r.status_code}"
+                    continue
                 data = r.json()
                 # print(f"[DEBUG] Try Key {key[:5]}... Code={data.get('result_code')}")
                 
@@ -386,6 +400,7 @@ class HealthClient:
                             valid_docs.append(doc)
                     
                     if valid_docs:
+                        self.last_error = None
                         return valid_docs
                     
                     # 如果没有有效排班的医生，尝试继续(虽然后续key可能也一样)或直接返回空
@@ -393,13 +408,107 @@ class HealthClient:
                     # 不过通常一个Key能拿到数据，其他Key拿到的也一样。
                     # 这里如果拿到doc_list但没拼出schedules，说明真没号。
                     if doc_list and not valid_docs:
-                         print("[-] 获取到医生列表但无具体排班信息")
-                         return []
+                        print("[-] 获取到医生列表但无具体排班信息")
+                        self.last_error = None
+                        return []
 
                 elif str(data.get('error_code')) == '10022':
+                    self.last_error = "登录已过期或权限不足 (error_code=10022)"
                     continue # 尝试下一个
+                else:
+                    err_code = data.get('error_code') or data.get('result_code')
+                    err_msg = (data.get('error_msg') or data.get('error_desc') or
+                               data.get('msg') or data.get('message') or data.get('result_msg'))
+                    self.last_error = f"排班接口返回异常: code={err_code} msg={err_msg}"
             except Exception as e:
+                self.last_error = f"排班接口解析失败: {e}"
                 print(f"[-] API Exception: {e}")
         
         print(f"[-] 排班查询失败 (Keys tested: {len(user_keys)})")
+        if not self.last_error:
+            self.last_error = "排班查询失败"
         return []
+
+
+class CookieKeepAlive(threading.Thread):
+    """
+    Cookie 保活守护线程
+    
+    每隔一定时间检查 Session 有效性，
+    如果失效则触发回调通知用户
+    """
+    
+    def __init__(self, client: HealthClient, 
+                 interval: int = 600,  # 默认 10 分钟
+                 on_expired: callable = None):
+        """
+        初始化保活线程
+        
+        Args:
+            client: HealthClient 实例
+            interval: 检查间隔（秒），默认 600
+            on_expired: Session 失效时的回调函数
+        """
+        super().__init__(daemon=True)
+        self.client = client
+        self.interval = interval
+        self.on_expired = on_expired
+        self.running = True
+        self._last_check = time.time()
+        self._consecutive_failures = 0
+    
+    def run(self):
+        """守护线程主循环"""
+        print(f"[+] Cookie 保活守护启动 (间隔: {self.interval}秒)")
+        
+        while self.running:
+            time.sleep(self.interval)
+            
+            if not self.running:
+                break
+            
+            try:
+                is_valid = self.client.check_login()
+                self._last_check = time.time()
+                
+                if is_valid:
+                    self._consecutive_failures = 0
+                    print(f"[*] Cookie 保活检查: 有效")
+                else:
+                    self._consecutive_failures += 1
+                    print(f"[-] Cookie 保活检查: 失效 (连续失败: {self._consecutive_failures})")
+                    
+                    if self.on_expired:
+                        self.on_expired()
+                    
+                    # 连续失败 3 次后降低检查频率
+                    if self._consecutive_failures >= 3:
+                        print("[!] Session 持续无效，等待用户重新登录")
+                        time.sleep(self.interval * 2)
+                        
+            except Exception as e:
+                print(f"[-] Cookie 保活检查异常: {e}")
+    
+    def stop(self):
+        """停止守护线程"""
+        self.running = False
+        print("[*] Cookie 保活守护已停止")
+
+
+def start_cookie_keepalive(client: HealthClient, 
+                           on_expired: callable = None,
+                           interval: int = 600) -> CookieKeepAlive:
+    """
+    启动 Cookie 保活守护线程
+    
+    Args:
+        client: HealthClient 实例
+        on_expired: Session 失效时的回调
+        interval: 检查间隔（秒）
+    
+    Returns:
+        CookieKeepAlive 线程实例
+    """
+    keepalive = CookieKeepAlive(client, interval, on_expired)
+    keepalive.start()
+    return keepalive
