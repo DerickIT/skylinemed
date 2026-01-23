@@ -7,6 +7,7 @@ import json
 import time
 import datetime
 import sys
+from typing import Callable, Optional
 from .client import HealthClient
 
 def load_config(path="config.json"):
@@ -113,7 +114,15 @@ def wait_until(target_time_str, client=None, use_server_time=False):
     except ValueError:
         print(f"[-] 时间格式错误: {target_time_str}，应为 HH:MM:SS")
 
-def grab(config, client):
+def _emit_log(on_log: Optional[Callable], message: str, level: str = "info"):
+    if on_log:
+        on_log(message, level)
+    else:
+        print(message)
+
+
+def grab(config, client, on_log: Optional[Callable] = None, stop_event: Optional[object] = None,
+         on_success: Optional[Callable] = None):
     """执行一次抢号尝试"""
     unit_id = config['unit_id']
     dep_id = config['dep_id']
@@ -125,21 +134,27 @@ def grab(config, client):
     
     # 获取排班
     for target_date in target_dates:
-        print(f"\n[*] 查询 {target_date} 排班...")
+        if stop_event and stop_event.is_set():
+            return False
+        _emit_log(on_log, f"\n[*] 查询 {target_date} 排班...", "info")
         docs = client.get_schedule(unit_id, dep_id, target_date)
         
         if not docs:
-            print(f"[-] {target_date} 无排班数据")
+            _emit_log(on_log, f"[-] {target_date} 无排班数据", "warn")
             continue
         
         # 筛选目标医生
         for doc in docs:
+            if stop_event and stop_event.is_set():
+                return False
             doc_id = str(doc.get('doctor_id'))
             if doctor_ids and doc_id not in doctor_ids:
                 continue
             
             schedules = doc.get('schedules', [])
             for sch in schedules:
+                if stop_event and stop_event.is_set():
+                    return False
                 # 检查时段类型
                 time_type = sch.get('time_type', '')
                 if time_type not in time_types:
@@ -157,7 +172,11 @@ def grab(config, client):
                 if not schedule_id:
                     continue
                 
-                print(f"[+] 发现可用号源: {doc.get('doctor_name')} - {sch.get('time_type_desc')} (余{left_num})")
+                _emit_log(
+                    on_log,
+                    f"[+] 发现可用号源: {doc.get('doctor_name')} - {sch.get('time_type_desc')} (余{left_num})",
+                    "success",
+                )
                 
                 # 获取号源详情
                 ticket_detail = client.get_ticket_detail(unit_id, dep_id, schedule_id)
@@ -170,7 +189,7 @@ def grab(config, client):
                 detlid_realtime = ticket_detail.get('detlid_realtime', '')
                 level_code = ticket_detail.get('level_code', '')
                 if not sch_data or not detlid_realtime or not level_code:
-                    print("[-] 号源详情缺少关键参数，跳过该号源")
+                    _emit_log(on_log, "[-] 号源详情缺少关键参数，跳过该号源", "warn")
                     continue
                 
                 # 选择时段
@@ -186,7 +205,36 @@ def grab(config, client):
                 if not selected_time:
                     selected_time = times[0]  # 默认选第一个
                 
-                print(f"[+] 选择时段: {selected_time['name']}")
+                _emit_log(on_log, f"[+] 选择时段: {selected_time['name']}", "info")
+
+                if stop_event and stop_event.is_set():
+                    return False
+
+                address_id = (
+                    config.get("addressId")
+                    or config.get("address_id")
+                    or ticket_detail.get("addressId")
+                    or ticket_detail.get("address_id")
+                )
+                address_text = (
+                    config.get("address")
+                    or ticket_detail.get("address")
+                )
+                if not address_id or not address_text:
+                    addresses = ticket_detail.get("addresses") or []
+                    if addresses:
+                        address_id = address_id or addresses[0].get("id", "")
+                        address_text = address_text or addresses[0].get("text", "")
+                        if address_id and address_text:
+                            _emit_log(
+                                on_log,
+                                f"未配置地址，使用页面地址: {address_text}",
+                                "warn",
+                            )
+                    if not address_id or not address_text:
+                        address_id = address_id or "3317"
+                        address_text = address_text or "Civic Center"
+                        _emit_log(on_log, "未配置地址，使用默认地址参数", "warn")
                 
                 # 提交订单
                 sch_date = sch.get('to_date', target_date)
@@ -200,6 +248,8 @@ def grab(config, client):
                     his_dep_id=doc.get('his_dep_id', ''),
                     detlid=selected_time['value'],
                     member_id=member_id,
+                    addressId=address_id,
+                    address=address_text,
                     sch_data=sch_data,
                     level_code=level_code,
                     sch_date=sch_date,
@@ -209,21 +259,34 @@ def grab(config, client):
                 )
                 
                 if result and (result.get('success') or result.get('status')):
-                    print(f"\n{'='*50}")
-                    print(f"[SUCCESS] 抢号成功!")
-                    print(f"医院: {config['unit_name']}")
-                    print(f"科室: {config['dep_name']}")
-                    print(f"医生: {doc.get('doctor_name')}")
-                    print(f"日期: {target_date}")
-                    print(f"时段: {selected_time['name']}")
-                    print(f"就诊人: {config['member_name']}")
+                    unit_name = config.get('unit_name', config.get('unit_id', ''))
+                    dep_name = config.get('dep_name', config.get('dep_id', ''))
+                    member_name = config.get('member_name', config.get('member_id', ''))
+                    _emit_log(on_log, f"\n{'='*50}", "success")
+                    _emit_log(on_log, "[SUCCESS] 抢号成功!", "success")
+                    _emit_log(on_log, f"医院: {unit_name}", "success")
+                    _emit_log(on_log, f"科室: {dep_name}", "success")
+                    _emit_log(on_log, f"医生: {doc.get('doctor_name')}", "success")
+                    _emit_log(on_log, f"日期: {target_date}", "success")
+                    _emit_log(on_log, f"时段: {selected_time['name']}", "success")
+                    _emit_log(on_log, f"就诊人: {member_name}", "success")
                     if result.get('url'):
-                        print(f"详情: {result['url']}")
-                    print(f"{'='*50}")
+                        _emit_log(on_log, f"详情: {result['url']}", "success")
+                    _emit_log(on_log, f"{'='*50}", "success")
+                    if on_success:
+                        on_success({
+                            'unit_name': unit_name,
+                            'dep_name': dep_name,
+                            'doctor_name': doc.get('doctor_name', ''),
+                            'date': target_date,
+                            'time_slot': selected_time.get('name', ''),
+                            'member_name': member_name,
+                            'url': result.get('url', ''),
+                        })
                     return True
                 else:
                     msg = result.get('msg') if isinstance(result, dict) else result
-                    print(f"[-] 提交失败: {msg}")
+                    _emit_log(on_log, f"[-] 提交失败: {msg}", "error")
     
     return False
 

@@ -10,6 +10,7 @@ import time
 import hashlib
 import random
 import string
+import re
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 
@@ -261,13 +262,36 @@ class TLSHealthClient:
             sch_data = soup.find('input', {'name': 'sch_data'})
             detlid_realtime = soup.find(id='detlid_realtime')
             level_code = soup.find(id='level_code')
+            address_id = ""
+            address_text = ""
+            address_list = []
+            address_input = soup.find('input', {'name': 'addressId'}) or soup.find(id='addressId')
+            if address_input:
+                address_id = address_input.get('value', '').strip()
+            address_text_input = soup.find('input', {'name': 'address'}) or soup.find(id='address')
+            if address_text_input:
+                address_text = address_text_input.get('value', '').strip()
+            address_select = soup.find('select', {'name': 'addressId'}) or soup.find(id='addressId')
+            if address_select and not address_id:
+                for option in address_select.find_all('option'):
+                    value = option.get('value', '').strip()
+                    text = option.get_text(strip=True)
+                    if value and text:
+                        address_list.append({'id': value, 'text': text})
+                if address_list:
+                    address_id = address_list[0]['id']
+                    if not address_text:
+                        address_text = address_list[0]['text']
             
             return {
                 'times': time_slots,
                 'time_slots': time_slots,
                 'sch_data': sch_data.get('value') if sch_data else '',
                 'detlid_realtime': detlid_realtime.get('value') if detlid_realtime else '',
-                'level_code': level_code.get('value') if level_code else ''
+                'level_code': level_code.get('value') if level_code else '',
+                'addressId': address_id,
+                'address': address_text,
+                'addresses': address_list
             }
         except Exception as e:
             print(f"[-] 获取号源详情失败: {e}")
@@ -305,7 +329,12 @@ class TLSHealthClient:
         }
         
         try:
-            r = self.session.post(url, data=data, allow_redirects=False)
+            headers = self._build_submit_headers(
+                params.get("unit_id"),
+                params.get("dep_id"),
+                params.get("schedule_id"),
+            )
+            r = self.session.post(url, data=data, headers=headers, allow_redirects=False)
             
             if r.status_code in [301, 302]:
                 redirect_url = r.headers.get('Location', '')
@@ -313,10 +342,110 @@ class TLSHealthClient:
                     return {'success': True, 'status': True, 'msg': 'OK', 'url': redirect_url}
                 else:
                     return {'success': False, 'status': False, 'msg': f'跳转异常: {redirect_url}'}
-            else:
-                return {'success': False, 'status': False, 'msg': f'Code={r.status_code}'}
+
+            content_type = r.headers.get('Content-Type', '')
+            content_encoding = r.headers.get('Content-Encoding', '')
+            content_length = len(r.content or b'')
+            text = r.text or ""
+            if not text.strip() and r.content:
+                try:
+                    text = r.content.decode(r.encoding or "utf-8", errors="ignore")
+                except Exception:
+                    text = ""
+            msg = self._extract_submit_message(text)
+            if msg:
+                return {'success': False, 'status': False, 'msg': f'提交失败: {msg}'}
+            snippet = re.sub(r'[\x00-\x1f\x7f]+', ' ', text)
+            snippet = re.sub(r'\s+', ' ', snippet).strip()[:200]
+            if snippet:
+                return {'success': False, 'status': False, 'msg': f'提交失败 Code={r.status_code}, Resp={snippet}'}
+            debug_path = self._dump_submit_response(r.content)
+            return {
+                'success': False,
+                'status': False,
+                'msg': (
+                    "提交失败 "
+                    f"Code={r.status_code}, "
+                    f"Content-Type={content_type or '-'}, "
+                    f"Content-Encoding={content_encoding or '-'}, "
+                    f"Len={content_length}, "
+                    f"Debug={debug_path}"
+                ),
+            }
         except Exception as e:
             return {'success': False, 'status': False, 'msg': str(e)}
+
+    def _extract_submit_message(self, text: str) -> str:
+        if not text:
+            return ""
+        patterns = [
+            r'alert\(["\']([^"\']+)["\']\)',
+            r'layer\.msg\(["\']([^"\']+)["\']\)',
+            r'layer\.alert\(["\']([^"\']+)["\']\)',
+            r'msg\(["\']([^"\']+)["\']\)',
+            r'toast\(["\']([^"\']+)["\']\)',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                return match.group(1).strip()
+        try:
+            soup = BeautifulSoup(text, 'html.parser')
+            title = soup.title.string.strip() if soup.title and soup.title.string else ""
+            return title
+        except Exception:
+            return ""
+
+    def _build_submit_headers(self, unit_id: str, dep_id: str, schedule_id: str) -> Dict:
+        headers = self.headers.copy()
+        if unit_id and dep_id and schedule_id:
+            referer_url = (
+                "https://www.91160.com/guahao/ystep1/"
+                f"uid-{unit_id}/depid-{dep_id}/schid-{schedule_id}.html"
+            )
+            headers["Referer"] = referer_url
+        headers["Origin"] = "https://www.91160.com"
+        headers["Connection"] = "keep-alive"
+        headers["Pragma"] = "no-cache"
+        headers["Cache-Control"] = "no-cache"
+        cookie_header = self._build_submit_cookie_header()
+        if cookie_header:
+            headers["Cookie"] = cookie_header
+        return headers
+
+    def _build_submit_cookie_header(self) -> str:
+        user_cookies = []
+        www_cookies = []
+        root_cookies = []
+        for c in self.session.cookies:
+            domain = (getattr(c, "domain", "") or "").lower()
+            if "user.91160.com" in domain:
+                user_cookies.append(c)
+            elif "www.91160.com" in domain:
+                www_cookies.append(c)
+            elif domain.endswith("91160.com") or domain == "":
+                root_cookies.append(c)
+        parts = []
+        seen = set()
+        for cookie in user_cookies + www_cookies + root_cookies:
+            name = cookie.name
+            if name in seen:
+                continue
+            seen.add(name)
+            parts.append(f"{name}={cookie.value}")
+        return "; ".join(parts)
+
+    def _dump_submit_response(self, content: bytes) -> str:
+        logs_dir = os.path.join(self.script_dir, "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        filename = f"submit_resp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.bin"
+        path = os.path.join(logs_dir, filename)
+        try:
+            with open(path, "wb") as f:
+                f.write(content or b"")
+        except Exception:
+            return path
+        return path
     
     def get_server_datetime(self) -> Optional[datetime]:
         """获取服务器时间"""

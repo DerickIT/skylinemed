@@ -8,6 +8,7 @@ import os
 import json
 import asyncio
 import threading
+import html
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
@@ -401,6 +402,7 @@ class MainWindow(QMainWindow):
         self.signals = WorkerSignals()
         self.cities: List[Dict] = []
         self.is_running = False
+        self.grab_stop_event = threading.Event()
         self.grab_thread: Optional[threading.Thread] = None
         self.qr_dialog: Optional[QRLoginDialog] = None
         self._combo_cache: Dict[QComboBox, List[tuple]] = {}
@@ -736,9 +738,42 @@ class MainWindow(QMainWindow):
     
     def _append_log(self, message: str, color: str):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        html = f'<span style="color: #666666;">[{timestamp}]</span> <span style="color: {color};">{message}</span><br>'
-        self.log_view.insertHtml(html)
+        safe_message = html.escape(message)
+        safe_message = safe_message.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
+        html_line = (
+            f'<span style="color: #666666;">[{timestamp}]</span> '
+            f'<span style="color: {color};">{safe_message}</span><br>'
+        )
+        self.log_view.insertHtml(html_line)
         self.log_view.ensureCursorVisible()
+
+    def _emit_grab_log(self, message: str, level: str = "info"):
+        color_map = {
+            "info": "#AAAAAA",
+            "success": "#00D26A",
+            "warn": "#FF9500",
+            "error": "#FF3B30",
+        }
+        self.signals.log.emit(message, color_map.get(level, "#AAAAAA"))
+
+    def _build_grab_config(self) -> Dict:
+        unit_id = self.hospital_combo.currentData()
+        dep_id = self.dep_combo.currentData()
+        doctor_id = self.doctor_combo.currentData()
+        member_id = self.member_combo.currentData()
+        date_str = self.date_edit.date().toString("yyyy-MM-dd")
+        return {
+            "unit_id": str(unit_id),
+            "unit_name": self.hospital_combo.currentText(),
+            "dep_id": str(dep_id),
+            "dep_name": self.dep_combo.currentText(),
+            "doctor_ids": [str(doctor_id)] if doctor_id not in (None, "") else [],
+            "member_id": str(member_id),
+            "member_name": self.member_combo.currentText(),
+            "target_dates": [date_str],
+            "time_types": ["am", "pm"],
+            "preferred_hours": [],
+        }
     
     def clear_logs(self):
         self.log_view.clear()
@@ -1018,6 +1053,7 @@ class MainWindow(QMainWindow):
     def toggle_grab(self):
         if self.is_running:
             self.is_running = False
+            self.grab_stop_event.set()
             self.signals.update_button.emit("🚀 开始抢号", "primary")
             self.log("任务已手动停止", "#FF9500")
         else:
@@ -1033,6 +1069,7 @@ class MainWindow(QMainWindow):
                 return
             
             self.is_running = True
+            self.grab_stop_event.clear()
             self.signals.update_button.emit("⏹️ 停止抢号", "danger")
             
             self.log(">>> 启动高频抢号引擎 <<<", "#00D26A")
@@ -1043,23 +1080,59 @@ class MainWindow(QMainWindow):
             self.grab_thread.start()
     
     def _grab_loop(self):
-        """抢号主循环（演示）"""
-        count = 0
-        while self.is_running:
-            count += 1
-            self.signals.log.emit(f"第 {count} 次尝试中...", "#FFFFFF")
-            
-            # TODO: 调用实际的 async_grab_once 逻辑
-            import time
-            time.sleep(1)
-            
-            if count > 10:  # 演示：10次后自动停止
-                self.signals.log.emit("为了演示，任务自动结束", "#007AFF")
+        """抢号主循环（真实抢号）"""
+        from core.grab import grab
+        import time
+
+        grab_client = HealthClient()
+        grab_client.load_cookies()
+        has_access_hash = any(
+            c.name == "access_hash" and c.value
+            for c in grab_client.session.cookies
+        )
+        if not has_access_hash:
+            self.signals.log.emit("缺少 access_hash，请重新扫码登录", "#FF3B30")
+            self.signals.login_status.emit(False)
+            self.is_running = False
+            self.signals.update_button.emit("🚀 开始抢号", "primary")
+            return
+
+        config = self._build_grab_config()
+        retry_interval = 0.5
+        attempt = 0
+
+        while self.is_running and not self.grab_stop_event.is_set():
+            attempt += 1
+            self.signals.log.emit(f"第 {attempt} 次尝试...", "#FFFFFF")
+
+            success = grab(
+                config,
+                grab_client,
+                on_log=self._emit_grab_log,
+                stop_event=self.grab_stop_event,
+            )
+
+            if success:
+                self.signals.log.emit("抢号成功，任务结束", "#00D26A")
                 break
-        
+
+            last_error = getattr(grab_client, "last_error", "") or ""
+            if "登录" in last_error or "access_hash" in last_error:
+                self.signals.log.emit(last_error, "#FF3B30")
+                self.signals.login_status.emit(False)
+                break
+
+            if not self.is_running or self.grab_stop_event.is_set():
+                break
+
+            time.sleep(retry_interval)
+
         self.is_running = False
         self.signals.update_button.emit("🚀 开始抢号", "primary")
-        self.signals.log.emit("抢号任务已结束", "#FF9500")
+        if self.grab_stop_event.is_set():
+            self.signals.log.emit("抢号任务已停止", "#FF9500")
+        else:
+            self.signals.log.emit("抢号任务已结束", "#FF9500")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
