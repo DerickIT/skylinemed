@@ -8,7 +8,6 @@
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import re
@@ -30,7 +29,9 @@ class QRLoginResult:
 
 def _cookie_path() -> str:
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(root_dir, "cookies.json")
+    config_dir = os.path.join(root_dir, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    return os.path.join(config_dir, "cookies.json")
 
 
 def _extract_cookie_list(cookies) -> list:
@@ -290,44 +291,3 @@ class FastQRLogin:
             return QRLoginResult(False, f"登录失败: {e}")
         finally:
             session.close()
-
-
-# 异步包装器（保留以兼容旧代码，但在 GUI 中已直接使用同步类）
-async def run_qr_login(
-    on_qr: Callable[[bytes], None],
-    on_status: Optional[Callable[[str], None]],
-    cancel_event: asyncio.Event,
-    timeout_sec: int = 300,
-    headless: bool = True,
-) -> QRLoginResult:
-    """
-    异步入口：在线程池中运行同步逻辑
-    """
-    login = FastQRLogin()
-    stop_flag = [False]
-    
-    # 监控取消
-    async def watch_cancel():
-        await cancel_event.wait()
-        stop_flag[0] = True
-        
-    watcher = asyncio.create_task(watch_cancel())
-    
-    def _run():
-        # 1. 获取二维码
-        try:
-            qr_bytes, uuid = login.get_qr_image()
-            on_qr(qr_bytes)
-        except Exception as e:
-            return QRLoginResult(False, f"获取二维码失败: {e}")
-            
-        if on_status: on_status("请使用微信扫码")
-        
-        # 2. 轮询
-        return login.poll_status(timeout_sec, on_status, stop_flag)
-        
-    try:
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _run)
-    finally:
-        watcher.cancel()

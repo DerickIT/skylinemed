@@ -6,7 +6,6 @@
 import json
 import time
 import datetime
-import sys
 from typing import Callable, Optional
 from .client import HealthClient
 

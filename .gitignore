@@ -7,8 +7,11 @@ __pycache__/
 # Sensitive Data
 cookies.json
 config.json
+config/user_state.json
 
 # Temporary Files & Artifacts
+logs/
+grab91160.db
 *.html
 *.png
 temp_reference/

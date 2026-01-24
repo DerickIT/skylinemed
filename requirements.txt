@@ -1,10 +1,5 @@
 requests
-httpx
 curl_cffi
-Pillow
 fake-useragent
-PySide6
-playwright
-ddddocr
-pycryptodome
 beautifulsoup4
+PySide6

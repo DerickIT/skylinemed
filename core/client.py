@@ -3,11 +3,7 @@ import json
 import time
 import os
 import re
-import hashlib
-import random
-import string
 import datetime
-import threading
 from urllib.parse import urljoin, unquote
 from email.utils import parsedate_to_datetime
 from fake_useragent import UserAgent
@@ -30,7 +26,9 @@ class HealthClient:
         self.session.headers.update(self.headers)
         # 使用脚本所在目录的绝对路径，避免工作目录问题
         self.script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.cookie_file = os.path.join(self.script_dir, 'cookies.json')
+        self.config_dir = os.path.join(self.script_dir, "config")
+        os.makedirs(self.config_dir, exist_ok=True)
+        self.cookie_file = os.path.join(self.config_dir, "cookies.json")
         self.last_error = None
         self.last_status_code = None
         
@@ -96,57 +94,44 @@ class HealthClient:
         except:
             return False
 
-    def login_with_browser(self):
-        """Playwright 扫码登录"""
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError:
-            print("[-] 未安装 playwright")
-            return False
+    def login_with_qr(self):
+        """curl_cffi 二维码登录（无浏览器）"""
+        from core.qr_login import FastQRLogin
 
-        print("[*] 启动浏览器...")
+        login = FastQRLogin()
         try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=False)
-                context = browser.new_context()
-                page = context.new_page()
-                
-                # 1. 构造微信扫码 URL
-                state = hashlib.md5(''.join(random.choices(string.ascii_letters + string.digits, k=16)).encode()).hexdigest()
-                url = f"https://open.weixin.qq.com/connect/qrconnect?appid=wxdfec0615563d691d&redirect_uri=http%3A%2F%2Fuser.91160.com%2Fsupplier-wechat.html&response_type=code&scope=snsapi_login&state={state}"
-                
-                page.goto(url)
-                print("[*] 请扫码登录...")
-                
-                # 2. 等待登录成功 (回到 91160)
-                try:
-                    page.wait_for_url(lambda u: "91160.com" in u and "weixin" not in u, timeout=300000)
-                except:
-                    print("[-] 扫码超时")
-                    browser.close()
-                    return False
-                
-                print("[+] 扫码成功，正在获取Cookie...")
-                
-                # 3. 快速访问子域获取 Cookie（不等待完全加载）
-                page.goto("https://www.91160.com/", wait_until="domcontentloaded")
-                page.goto("https://user.91160.com/user/index.html", wait_until="domcontentloaded")
-                
-                # 4. 立即提取 Cookie
-                cookies = context.cookies()
-                print(f"[*] 提取到 {len(cookies)} 个 Cookie")
-                
-                self.save_cookies_from_browser(cookies)
-                browser.close()
-                return True
-
+            qr_bytes, _ = login.get_qr_image()
         except Exception as e:
-            error_msg = str(e)
-            if "executable doesn't exist" in error_msg or "Executable doesn't exist" in error_msg:
-                print("[-] Playwright 浏览器未安装！请运行: playwright install chromium")
-            else:
-                print(f"[-] 浏览器登录失败: {e}")
+            print(f"[-] 获取二维码失败: {e}")
             return False
+
+        qr_path = os.path.join(self.config_dir, "qr_login.png")
+        try:
+            with open(qr_path, "wb") as f:
+                f.write(qr_bytes)
+        except Exception as e:
+            print(f"[-] 保存二维码失败: {e}")
+            return False
+
+        print(f"[*] 二维码已保存: {qr_path}")
+        print("[*] 请用微信扫码登录，等待确认...")
+
+        def on_status(msg: str):
+            print(f"[*] {msg}")
+
+        try:
+            result = login.poll_status(timeout_sec=300, on_status=on_status)
+        except Exception as e:
+            print(f"[-] 轮询失败: {e}")
+            return False
+
+        if result.success:
+            print(f"[+] 登录成功，Cookie 已保存: {result.cookie_path}")
+            self.load_cookies()
+            return True
+
+        print(f"[-] 登录失败: {result.message}")
+        return False
 
     def login(self):
         # 先尝试加载本地 Cookie
@@ -156,8 +141,8 @@ class HealthClient:
             print("[+] Cookie 验证成功")
             return True
         
-        print("[*] Cookie 已失效或未登录，启动浏览器扫码...")
-        return self.login_with_browser()
+        print("[*] Cookie 已失效或未登录，启动二维码登录...")
+        return self.login_with_qr()
 
     # ============ API 接口 ============
     
@@ -769,85 +754,3 @@ class HealthClient:
         return []
 
 
-class CookieKeepAlive(threading.Thread):
-    """
-    Cookie 保活守护线程
-    
-    每隔一定时间检查 Session 有效性，
-    如果失效则触发回调通知用户
-    """
-    
-    def __init__(self, client: HealthClient, 
-                 interval: int = 600,  # 默认 10 分钟
-                 on_expired: callable = None):
-        """
-        初始化保活线程
-        
-        Args:
-            client: HealthClient 实例
-            interval: 检查间隔（秒），默认 600
-            on_expired: Session 失效时的回调函数
-        """
-        super().__init__(daemon=True)
-        self.client = client
-        self.interval = interval
-        self.on_expired = on_expired
-        self.running = True
-        self._last_check = time.time()
-        self._consecutive_failures = 0
-    
-    def run(self):
-        """守护线程主循环"""
-        print(f"[+] Cookie 保活守护启动 (间隔: {self.interval}秒)")
-        
-        while self.running:
-            time.sleep(self.interval)
-            
-            if not self.running:
-                break
-            
-            try:
-                is_valid = self.client.check_login()
-                self._last_check = time.time()
-                
-                if is_valid:
-                    self._consecutive_failures = 0
-                    print(f"[*] Cookie 保活检查: 有效")
-                else:
-                    self._consecutive_failures += 1
-                    print(f"[-] Cookie 保活检查: 失效 (连续失败: {self._consecutive_failures})")
-                    
-                    if self.on_expired:
-                        self.on_expired()
-                    
-                    # 连续失败 3 次后降低检查频率
-                    if self._consecutive_failures >= 3:
-                        print("[!] Session 持续无效，等待用户重新登录")
-                        time.sleep(self.interval * 2)
-                        
-            except Exception as e:
-                print(f"[-] Cookie 保活检查异常: {e}")
-    
-    def stop(self):
-        """停止守护线程"""
-        self.running = False
-        print("[*] Cookie 保活守护已停止")
-
-
-def start_cookie_keepalive(client: HealthClient, 
-                           on_expired: callable = None,
-                           interval: int = 600) -> CookieKeepAlive:
-    """
-    启动 Cookie 保活守护线程
-    
-    Args:
-        client: HealthClient 实例
-        on_expired: Session 失效时的回调
-        interval: 检查间隔（秒）
-    
-    Returns:
-        CookieKeepAlive 线程实例
-    """
-    keepalive = CookieKeepAlive(client, interval, on_expired)
-    keepalive.start()
-    return keepalive
