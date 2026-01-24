@@ -1,17 +1,15 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-.venv_fix/
+# Wails/Go
+build/bin/
+frontend/dist/
+node_modules/
+frontend/node_modules/
 
 # Sensitive Data
-cookies.json
-config.json
+config/cookies.json
 config/user_state.json
 
 # Temporary Files & Artifacts
 logs/
-grab91160.db
 *.html
 *.png
 temp_reference/

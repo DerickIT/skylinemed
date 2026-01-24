@@ -1,4 +1,4 @@
-name: Build Windows Exe
+name: Build Windows (Wails)
 
 on:
   push:
@@ -17,37 +17,44 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Set up Go
+      uses: actions/setup-go@v5
       with:
-        python-version: '3.11'
-        cache: 'pip'
+        go-version-file: go.mod
+        cache: true
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
 
-    - name: Build with PyInstaller
+    - name: Install Wails CLI
       run: |
-        pyinstaller build.spec
+        go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+        $gopath = go env GOPATH
+        "$gopath\\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Build with Wails
+      run: |
+        wails build -platform windows/amd64 -clean
 
     - name: Create Zip Archive
       run: |
-        Compress-Archive -Path dist/91160Grabber -DestinationPath 91160Grabber-Win64.zip
+        Compress-Archive -Path build/bin/* -DestinationPath QuickDoctor-Win64.zip
 
     - name: Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
-          91160Grabber-Win64.zip
+          QuickDoctor-Win64.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: 91160Grabber-Win64
-        path: dist/91160Grabber
+        name: QuickDoctor-Win64
+        path: build/bin

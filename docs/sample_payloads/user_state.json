@@ -1,0 +1,10 @@
+{
+  "city_id": "5",
+  "unit_id": "10001",
+  "dep_id": "20002",
+  "doctor_id": "30003",
+  "member_id": "40004",
+  "target_date": "2026-01-28",
+  "target_dates": ["2026-01-30", "2026-02-01"],
+  "time_slots": ["am", "pm"]
+}
