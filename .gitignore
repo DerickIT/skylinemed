@@ -10,7 +10,6 @@ config/user_state.json
 
 # Temporary Files & Artifacts
 logs/
-*.html
 *.png
 temp_reference/
 cleanup_plan.md
