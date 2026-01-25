@@ -48,12 +48,12 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        name: QuickDoctor ${{ github.ref_name }} (Windows x64)
+        name: QuickDoctor ${{ github.ref_name }}（Windows x64）
         body: |
-          Platform: Windows 64-bit (windows/amd64)
-          Build: Wails v2.11.0 + Go (from go.mod)
-          Artifact: QuickDoctor-Win64.zip
-          Trigger: tag ${{ github.ref_name }}
+          平台：Windows 64 位（windows/amd64）
+          构建：Wails v2.11.0 + Go（以 go.mod 为准）
+          产物：QuickDoctor-Win64.zip
+          触发：标签 ${{ github.ref_name }}
         files: |
           QuickDoctor-Win64.zip
       env:

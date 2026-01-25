@@ -31,6 +31,12 @@ wails build
 
 构建产物位于 `build/bin/`。
 
+## 📥 下载与使用（Windows）
+1. 打开 GitHub Releases，下载 `QuickDoctor-Win64.zip`。
+2. 解压到任意目录（建议纯英文路径）。
+3. 运行解压目录中的 `.exe` 文件启动程序。
+4. 按界面提示完成微信扫码登录、号源查询与提交。
+
 ## 📂 配置与数据
 - `config/cities.json`：城市列表
 - `config/user_state.json`：UI 状态（本地）
