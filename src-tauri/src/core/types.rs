@@ -187,6 +187,7 @@ fn default_path() -> String {
 }
 
 /// City information
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct City {
     #[serde(rename = "cityId")]
@@ -195,6 +196,7 @@ pub struct City {
 }
 
 /// Hospital information
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hospital {
     pub unit_id: String,
@@ -202,6 +204,7 @@ pub struct Hospital {
 }
 
 /// Department information
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Department {
     pub dep_id: String,

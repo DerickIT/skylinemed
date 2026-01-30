@@ -7,14 +7,14 @@ use std::time::Duration;
 
 use reqwest::cookie::Jar;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE, ORIGIN, REFERER, USER_AGENT};
-use reqwest::{Client, Response};
+use reqwest::Client;
 use scraper::{Html, Selector};
 use tokio::sync::RwLock;
 use url::Url;
 
 use super::cookies::{has_access_hash, load_cookie_file, save_cookie_file, unique_strings};
 use super::errors::{AppError, AppResult};
-use super::types::{CookieRecord, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption};
+use super::types::{CookieRecord, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital, Department, City};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -175,7 +175,7 @@ impl HealthClient {
     }
 
     /// Get hospitals by city
-    pub async fn get_hospitals_by_city(&self, city_id: &str) -> AppResult<Vec<HashMap<String, serde_json::Value>>> {
+    pub async fn get_hospitals_by_city(&self, city_id: &str) -> AppResult<Vec<Hospital>> {
         let city = if city_id.is_empty() { "5" } else { city_id };
 
         let mut headers = Self::default_headers();
@@ -189,12 +189,12 @@ impl HealthClient {
             .send()
             .await?;
 
-        let data: Vec<HashMap<String, serde_json::Value>> = resp.json().await?;
+        let data: Vec<Hospital> = resp.json().await?;
         Ok(data)
     }
 
     /// Get departments by unit
-    pub async fn get_deps_by_unit(&self, unit_id: &str) -> AppResult<Vec<HashMap<String, serde_json::Value>>> {
+    pub async fn get_deps_by_unit(&self, unit_id: &str) -> AppResult<Vec<Department>> {
         let mut headers = Self::default_headers();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"));
 
@@ -206,7 +206,7 @@ impl HealthClient {
             .send()
             .await?;
 
-        let data: Vec<HashMap<String, serde_json::Value>> = resp.json().await?;
+        let data: Vec<Department> = resp.json().await?;
         Ok(data)
     }
 
@@ -456,7 +456,7 @@ impl HealthClient {
         unit_id: &str,
         dep_id: &str,
         schedule_id: &str,
-        member_id: &str,
+        _member_id: &str,
     ) -> AppResult<TicketDetail> {
         let url = format!(
             "https://www.91160.com/guahao/ystep1/uid-{}/depid-{}/schid-{}.html",
@@ -553,8 +553,8 @@ impl HealthClient {
         })
     }
 
-    /// Submit an order
-    pub async fn submit_order(&self, params: &HashMap<String, String>) -> AppResult<SubmitOrderResult> {
+    /// Submit an order with optional proxy
+    pub async fn submit_order(&self, params: &HashMap<String, String>, proxy_url: Option<String>) -> AppResult<SubmitOrderResult> {
         let mut data: HashMap<String, String> = HashMap::new();
         
         // Map parameters
@@ -596,8 +596,19 @@ impl HealthClient {
             headers.insert(REFERER, v);
         }
 
-        let resp = self
-            .client
+        let client = if let Some(url) = proxy_url {
+            let proxy = reqwest::Proxy::all(&url).map_err(|e| AppError::ProxyError(e.to_string()))?;
+            reqwest::Client::builder()
+                .user_agent(DEFAULT_USER_AGENT)
+                .cookie_provider(self.cookie_jar.clone())
+                .proxy(proxy)
+                .timeout(Duration::from_secs(30))
+                .build()?
+        } else {
+            self.client.clone()
+        };
+
+        let resp = client
             .post("https://www.91160.com/guahao/ysubmit.html")
             .headers(headers)
             .form(&data)

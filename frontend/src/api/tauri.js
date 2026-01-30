@@ -18,10 +18,10 @@ export const GetHospitalsByCity = (cityId) => invoke('get_hospitals_by_city', { 
 
 export const GetDepsByUnit = (unitId) => invoke('get_deps_by_unit', { unit_id: unitId });
 
-export const GetSchedule = (unitId, depId, date) => invoke('get_schedule', { 
-    unit_id: unitId, 
-    dep_id: depId, 
-    date: date 
+export const GetSchedule = (unitId, depId, date) => invoke('get_schedule', {
+    unit_id: unitId,
+    dep_id: depId,
+    date: date
 });
 
 // --- Grab Task ---
@@ -40,15 +40,16 @@ export const ExportLogs = (logs) => invoke('export_logs', { logs });
  * @param {string} eventName 
  * @param {function} callback 
  */
-export const EventsOn = (eventName, callback) => {
-    listen(eventName, (event) => {
-        // Tauri V2 event object: { event: string, payload: any, id: number }
-        // Wails passes payload directly
-        callback(event.payload);
-    }).then(unlisten => {
-        // We ignore unlisten for now as Wails listeners were typically global
-        // If needed, we could return it
-    }).catch(err => {
+export const EventsOn = async (eventName, callback) => {
+    try {
+        console.log(`[Tauri] Attempting to listen to ${eventName}...`);
+        const unlisten = await listen(eventName, (event) => {
+            console.log(`[Tauri Event] ${eventName} received! Payload:`, event.payload);
+            callback(event.payload);
+        });
+        console.log(`[Tauri] Registered listener for ${eventName}`);
+        return unlisten;
+    } catch (err) {
         console.error(`[Tauri] Failed to listen to ${eventName}:`, err);
-    });
+    }
 };

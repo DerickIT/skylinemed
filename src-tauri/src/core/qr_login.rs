@@ -257,15 +257,18 @@ impl FastQRLogin {
 
     /// Exchange code for cookies
     async fn exchange_cookie(&self, code: &str) -> QRLoginResult {
+        println!(">>> Debug: Starting cookie exchange with code: {}", code);
         let cookie_jar = Arc::new(Jar::default());
 
         let client = match Client::builder()
             .user_agent(DEFAULT_USER_AGENT)
             .cookie_provider(cookie_jar.clone())
+            .redirect(reqwest::redirect::Policy::limited(10))
             .build()
         {
             Ok(c) => c,
             Err(e) => {
+                println!(">>> Debug: Client build failed: {}", e);
                 return QRLoginResult {
                     success: false,
                     message: e.to_string(),
@@ -284,25 +287,31 @@ impl FastQRLogin {
         } else {
             format!("{}?code={}&state={}", WECHAT_REDIRECT, code, urlencoding::encode(&state))
         };
+        println!(">>> Debug: Callback URL: {}", callback_url);
 
         // Follow redirect chain
-        let _ = client
+        match client
             .get(&callback_url)
             .header(USER_AGENT, DEFAULT_USER_AGENT)
             .header(REFERER, QR_CONNECT_ORIGIN)
             .send()
-            .await;
+            .await 
+        {
+            Ok(resp) => println!(">>> Debug: Callback response: status={}, url={}", resp.status(), resp.url()),
+            Err(e) => println!(">>> Debug: Callback request failed: {}", e),
+        }
 
         let _ = client.get("https://www.91160.com/").send().await;
         let _ = client.get("https://user.91160.com/user/index.html").send().await;
 
         // Extract cookies from jar - use CookieStore trait
         let mut records = Vec::new();
-        for domain in ["www.91160.com", "user.91160.com", ".91160.com"] {
-            if let Ok(url) = Url::parse(&format!("https://{}", domain)) {
-                // CookieStore::cookies returns Option<HeaderValue>
+        // Check valid domains that would contain the cookies
+        for start_url in ["https://www.91160.com", "https://user.91160.com"] {
+            if let Ok(url) = Url::parse(start_url) {
                 use reqwest::cookie::CookieStore;
                 if let Some(header_value) = cookie_jar.cookies(&url) {
+                    println!(">>> Debug: Cookies for {}: {:?}", start_url, header_value);
                     if let Ok(cookie_str) = header_value.to_str() {
                         for part in cookie_str.split(';') {
                             let part = part.trim();
@@ -313,18 +322,21 @@ impl FastQRLogin {
                                     records.push(CookieRecord {
                                         name,
                                         value,
-                                        domain: format!(".{}", domain.trim_start_matches('.')),
+                                        domain: ".91160.com".into(), // Default to root domain
                                         path: "/".into(),
                                     });
                                 }
                             }
                         }
                     }
+                } else {
+                    println!(">>> Debug: No cookies found for {}", start_url);
                 }
             }
         }
 
         if records.is_empty() {
+            println!(">>> Debug: No cookies extracted from any domain");
             return QRLoginResult {
                 success: false,
                 message: "no cookies received".into(),
@@ -332,18 +344,28 @@ impl FastQRLogin {
             };
         }
 
+        // Force allow login even if access_hash is missing for debugging, but log it
         let has_access = records.iter().any(|r| r.name == "access_hash");
         if !has_access {
-            return QRLoginResult {
-                success: false,
-                message: "missing access_hash".into(),
-                cookie_path: None,
-            };
+            println!(">>> Debug: WARNING - access_hash missing in cookies: {:?}", records);
+            // We temporarily allow it to proceed to see if it works anyway or what state we are in
+            // But the original error said "missing access_hash", so let's keep failing but with better logs
+            // Actually, let's NOT fail, let's Try to save anyway so we can inspect the file
         }
 
         match save_cookie_file(&records) {
             Ok(()) => {
                 let path = super::paths::cookies_path().ok().map(|p| p.to_string_lossy().to_string());
+                
+                // If we are strictly checking for access_hash, we should return error here if missing
+                if !has_access {
+                     return QRLoginResult {
+                        success: false,
+                        message: "missing access_hash (check console for details)".into(),
+                        cookie_path: path, // Return path so we know it saved something
+                    };
+                }
+
                 QRLoginResult {
                     success: true,
                     message: "login ok".into(),

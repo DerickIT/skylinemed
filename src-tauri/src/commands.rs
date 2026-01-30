@@ -45,32 +45,43 @@ impl Default for AppState {
 
 /// Get cities list
 #[tauri::command]
-pub async fn get_cities() -> Result<Vec<Value>, String> {
+pub async fn get_cities() -> Result<Vec<crate::core::types::City>, String> {
+    println!(">>> Command: get_cities");
     let path = cities_path().map_err(|e| e.to_string())?;
     let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let cities: Vec<Value> = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    let cities: Vec<crate::core::types::City> = serde_json::from_str(&data).map_err(|e| e.to_string())?;
     Ok(cities)
 }
 
 /// Get user state
 #[tauri::command]
-pub async fn get_user_state() -> Result<HashMap<String, Value>, String> {
-    load_user_state().map_err(|e| e.to_string())
+pub async fn get_user_state() -> Result<crate::core::types::UserState, String> {
+    println!(">>> Command: get_user_state");
+    let map = load_user_state().map_err(|e| e.to_string())?;
+    Ok(crate::core::state::to_user_state_struct(&map))
 }
 
 /// Save user state
 #[tauri::command]
-pub async fn save_user_state_cmd(state: HashMap<String, Value>) -> Result<(), String> {
-    save_user_state(state).map_err(|e| e.to_string())
+pub async fn save_user_state_cmd(state: crate::core::types::UserState) -> Result<(), String> {
+    println!(">>> Command: save_user_state_cmd: {:?}", state);
+    let val = serde_json::to_value(state).map_err(|e| e.to_string())?;
+    if let Value::Object(map) = val {
+        let converted = map.into_iter().collect();
+        save_user_state(converted).map_err(|e| e.to_string())
+    } else {
+        Err("invalid state object".into())
+    }
 }
 
 /// Export logs to file
 #[tauri::command]
 pub async fn export_logs(
-    app: AppHandle,
+    _app: AppHandle,
     entries: Vec<LogEntry>,
 ) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
+    // Dialog plugin is registered in main.rs but not used here anymore as we use paths directly
+    // If needed for future interactive saves, we can re-enable it.
 
     if entries.is_empty() {
         return Err("log entries is empty".into());
@@ -111,7 +122,8 @@ pub async fn export_logs(
 pub async fn get_hospitals_by_city(
     state: State<'_, AppState>,
     city_id: String,
-) -> Result<Vec<HashMap<String, Value>>, String> {
+) -> Result<Vec<crate::core::types::Hospital>, String> {
+    println!(">>> Command: get_hospitals_by_city(id={})", city_id);
     state.client.ensure_cookies_loaded().await;
     state
         .client
@@ -125,7 +137,8 @@ pub async fn get_hospitals_by_city(
 pub async fn get_deps_by_unit(
     state: State<'_, AppState>,
     unit_id: String,
-) -> Result<Vec<HashMap<String, Value>>, String> {
+) -> Result<Vec<crate::core::types::Department>, String> {
+    println!(">>> Command: get_deps_by_unit(id={})", unit_id);
     state.client.ensure_cookies_loaded().await;
     state
         .client
@@ -137,6 +150,7 @@ pub async fn get_deps_by_unit(
 /// Get members
 #[tauri::command]
 pub async fn get_members(state: State<'_, AppState>) -> Result<Vec<Member>, String> {
+    println!(">>> Command: get_members");
     state.client.ensure_cookies_loaded().await;
     state.client.get_members().await.map_err(|e| e.to_string())
 }
@@ -144,6 +158,7 @@ pub async fn get_members(state: State<'_, AppState>) -> Result<Vec<Member>, Stri
 /// Check login status
 #[tauri::command]
 pub async fn check_login(app: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+    println!(">>> Command: check_login");
     let loaded = state.client.ensure_cookies_loaded().await;
 
     if !loaded && !state.client.has_access_hash().await {
@@ -172,22 +187,15 @@ pub async fn get_schedule(
     unit_id: String,
     dep_id: String,
     date: String,
-) -> Result<Vec<Value>, String> {
+) -> Result<Vec<crate::core::types::DoctorSchedule>, String> {
+    println!(">>> Command: get_schedule(unit={}, dep={}, date={})", unit_id, dep_id, date);
     state.client.ensure_cookies_loaded().await;
     
-    let docs = state
+    state
         .client
         .get_schedule(&unit_id, &dep_id, &date)
         .await
-        .map_err(|e| e.to_string())?;
-
-    // Convert to Value for frontend
-    let result: Vec<Value> = docs
-        .into_iter()
-        .map(|d| serde_json::to_value(d).unwrap_or_default())
-        .collect();
-
-    Ok(result)
+        .map_err(|e| e.to_string())
 }
 
 /// Get ticket detail
@@ -220,7 +228,7 @@ pub async fn submit_order(
     
     let result = state
         .client
-        .submit_order(&params)
+        .submit_order(&params, None)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -230,6 +238,7 @@ pub async fn submit_order(
 /// Start QR login
 #[tauri::command]
 pub async fn start_qr_login(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    println!(">>> Command: start_qr_login");
     // Cancel any existing QR login
     {
         let mut cancel = state.qr_cancel.write().await;
@@ -271,6 +280,7 @@ pub async fn start_grab(
     state: State<'_, AppState>,
     config: GrabConfig,
 ) -> Result<(), String> {
+    println!(">>> Command: start_grab(unit={})", config.unit_id);
     // Ensure logged in
     state.client.ensure_cookies_loaded().await;
     if !state.client.has_access_hash().await {
@@ -338,6 +348,7 @@ async fn run_qr_login(app: AppHandle, client: Arc<HealthClient>, _cancel_token: 
     };
 
     // Emit QR image
+    println!(">>> Emitting qr-image event...");
     let _ = app.emit(
         "qr-image",
         serde_json::json!({

@@ -312,8 +312,24 @@ impl Grabber {
                 // Apply throttle
                 self.apply_submit_throttle(on_log).await;
 
+                // Proxy rotation
+                let proxy_url = if config.use_proxy_submit {
+                    match self.proxy_pool.rotate_proxy("https", "CN").await {
+                        Ok(url) => {
+                            emit_log(on_log, "info", &format!("using proxy: {}", url));
+                            Some(url)
+                        }
+                        Err(e) => {
+                            emit_log(on_log, "warn", &format!("proxy rotation failed: {}, using direct connection", e));
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
                 // Submit
-                match self.client.submit_order(&submit_params).await {
+                match self.client.submit_order(&submit_params, proxy_url).await {
                     Ok(result) if result.success || result.status => {
                         let unit_name = if config.unit_name.is_empty() { &config.unit_id } else { &config.unit_name };
                         let dep_name = if config.dep_name.is_empty() { &config.dep_id } else { &config.dep_name };

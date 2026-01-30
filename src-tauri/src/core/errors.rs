@@ -27,12 +27,14 @@ pub enum AppError {
     #[error("API error: {0}")]
     ApiError(String),
 
+    #[allow(dead_code)]
     #[error("Timeout: {0}")]
     Timeout(String),
 
     #[error("Cancelled")]
     Cancelled,
 
+    #[allow(dead_code)]
     #[error("Proxy error: {0}")]
     ProxyError(String),
 
