@@ -135,63 +135,68 @@ watch(filteredOptions, () => {
 
 <template>
   <div ref="containerRef" class="relative group">
-    <label v-if="label" class="block text-xs text-slate-400 mb-1.5 uppercase">{{ label }}</label>
+    <label v-if="label" class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{{ label }}</label>
+    
     <div class="relative">
-        <input 
-            type="text"
-            v-model="searchQuery"
-            @input="handleInput"
-            @focus="handleFocus"
-            @keydown="onKeyDown"
-            :placeholder="placeholder || '请选择...'"
-            :disabled="disabled"
-            class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none text-slate-200 placeholder-slate-500 transition-all"
-            :class="{'cursor-not-allowed opacity-50': disabled}"
-        />
-        <!-- Chevron Icon -->
-        <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-             <svg v-if="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-             <svg v-else class="h-4 w-4 transition-transform duration-200" :class="{'rotate-180': isOpen}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-        </div>
+      <input
+        type="text"
+        v-model="searchQuery"
+        @input="handleInput"
+        @focus="handleFocus"
+        @keydown="onKeyDown"
+        :placeholder="placeholder || '请选择...'"
+        :disabled="disabled"
+        class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none hover:bg-white transition-all text-slate-700 font-medium placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+      />
+      
+      <div v-if="loading" class="absolute right-4 top-1/2 -translate-y-1/2">
+        <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <div v-else class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+         <svg class="w-4 h-4 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+      </div>
     </div>
 
     <!-- Dropdown -->
-    <Transition
-      enter-active-class="transition duration-100 ease-out"
-      enter-from-class="transform scale-95 opacity-0"
-      enter-to-class="transform scale-100 opacity-100"
-      leave-active-class="transition duration-75 ease-in"
-      leave-from-class="transform scale-100 opacity-100"
-      leave-to-class="transform scale-95 opacity-0"
-    >
-        <div v-if="isOpen" class="absolute z-[100] w-full mt-1 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl max-h-60 overflow-y-auto custom-scrollbar ring-1 ring-black/5">
-            <ul v-if="filteredOptions.length > 0" class="py-1">
-                <li 
-                    v-for="(option, index) in filteredOptions" 
-                    :key="option[keyField]"
-                    @click="selectOption(option)"
-                    @mousemove="highlightIndex = index"
-                    :class="[
-                        'px-4 py-2.5 text-sm cursor-pointer transition-colors border-l-2',
-                        index === highlightIndex ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500' : 'text-slate-300 border-transparent hover:bg-white/5'
-                    ]"
-                >
-                    {{ option[labelField] }}
-                </li>
-            </ul>
-            <div v-else class="px-4 py-3 text-sm text-slate-500 text-center">
-                {{ searchQuery ? '无匹配结果' : '无数据' }}
-            </div>
+    <Transition name="fade-up">
+      <div v-if="isOpen && !disabled" class="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto custom-scrollbar p-1">
+        <ul v-if="filteredOptions.length > 0">
+           <li 
+             v-for="(option, index) in filteredOptions" 
+             :key="option[keyField]"
+             @click="selectOption(option)"
+             @mousemove="highlightIndex = index"
+             :class="['px-4 py-2.5 rounded-xl cursor-pointer text-sm font-medium transition-colors flex justify-between items-center', 
+               index === highlightIndex ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50']"
+           >
+              <span>{{ option[labelField] }}</span>
+              <svg v-if="modelValue === option[keyField]" class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+           </li>
+        </ul>
+        <div v-else class="px-4 py-8 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">
+            {{ searchQuery ? '无匹配结果' : '无数据' }}
         </div>
+      </div>
     </Transition>
   </div>
 </template>
 
 <style scoped>
+.fade-up-enter-active, .fade-up-leave-active {
+  transition: all 0.2s ease-out;
+}
+.fade-up-enter-from, .fade-up-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-slate-700 rounded;
+  @apply bg-slate-200 rounded-full;
 }
 </style>

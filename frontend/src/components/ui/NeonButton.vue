@@ -25,7 +25,7 @@ const classes = computed(() => {
     primary: 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 border border-white/10',
     success: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 border border-white/10',
     danger: 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-500/20 border border-white/10',
-    ghost: 'bg-zinc-800/50 hover:bg-zinc-700/80 text-zinc-100 border border-white/5 hover:border-white/10'
+    ghost: 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 hover:border-slate-300'
   }
 
   const sizes = {

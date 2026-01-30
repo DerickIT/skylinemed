@@ -218,8 +218,9 @@ where
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hospital {
-    #[serde(deserialize_with = "deserialize_flexible_string")]
+    #[serde(deserialize_with = "deserialize_flexible_string", alias = "id")]
     pub unit_id: String,
+    #[serde(alias = "name")]
     pub unit_name: String,
 }
 
@@ -227,8 +228,9 @@ pub struct Hospital {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Department {
-    #[serde(deserialize_with = "deserialize_flexible_string")]
+    #[serde(deserialize_with = "deserialize_flexible_string", alias = "id")]
     pub dep_id: String,
+    #[serde(alias = "name")]
     pub dep_name: String,
     #[serde(default)]
     pub childs: Vec<Department>,
@@ -245,7 +247,7 @@ pub struct LogEntry {
 /// Schedule slot information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduleSlot {
-    #[serde(deserialize_with = "deserialize_flexible_string")]
+    #[serde(deserialize_with = "deserialize_flexible_string", alias = "id")]
     pub schedule_id: String,
     pub time_type: String,
     pub time_type_desc: String,

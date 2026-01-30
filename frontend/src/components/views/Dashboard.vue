@@ -122,16 +122,16 @@ const proxySubmitEnabled = computed(() => {
     <!-- Luxury Header -->
     <header class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold tracking-tight text-white mb-2">
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">
           {{ loggedIn ? '欢迎回来，天际医航' : '开启便捷就医之旅' }}
         </h1>
-        <p class="text-zinc-400 max-w-lg">
+        <p class="text-slate-500 max-w-lg">
           {{ loggedIn ? '系统已准备就绪，随时可以进行号源锁定与极速预约。' : '请先扫码登录，然后配置您的预约目标，我们会为您实时监控。' }}
         </p>
       </div>
       <div v-if="loggedIn" class="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full animate-pulse-subtle">
         <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
-        <span class="text-xs font-semibold text-emerald-400 uppercase tracking-widest">服务连接正常</span>
+        <span class="text-xs font-semibold text-emerald-600 uppercase tracking-widest">服务连接正常</span>
       </div>
     </header>
 
@@ -142,10 +142,10 @@ const proxySubmitEnabled = computed(() => {
           <div class="relative group">
             <div :class="['flex items-center justify-center border-[6px] transition-all duration-700 ease-in-out overflow-hidden', 
                 loggedIn 
-                  ? 'w-36 h-36 rounded-full border-zinc-800 shadow-[0_20px_50px_rgba(0,0,0,0.5)] scale-100 opacity-100' 
-                  : 'w-56 h-56 rounded-3xl border-white/5 bg-white shadow-2xl scale-100']">
+                  ? 'w-36 h-36 rounded-full border-white shadow-[0_20px_50px_rgba(0,0,0,0.1)] scale-100 opacity-100' 
+                  : 'w-56 h-56 rounded-3xl border-slate-100 bg-white shadow-xl scale-100']">
                 <img v-if="qrImageUrl && !loggedIn" :src="qrImageUrl" class="w-full h-full object-contain p-4" />
-                <div v-else class="flex items-center justify-center w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900">
+                <div v-else class="flex items-center justify-center w-full h-full bg-slate-50">
                    <svg v-if="loggedIn" class="w-16 h-16 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                    </svg>
@@ -155,12 +155,12 @@ const proxySubmitEnabled = computed(() => {
                 </div>
             </div>
             <!-- Glow effect behind QR -->
-            <div v-if="!loggedIn && qrImageUrl" class="absolute -inset-4 bg-blue-500/10 blur-2xl -z-10 rounded-full animate-float opacity-50"></div>
+            <div v-if="!loggedIn && qrImageUrl" class="absolute -inset-4 bg-blue-500/10 blur-xl -z-10 rounded-full animate-float opacity-70"></div>
           </div>
           
           <div class="text-center space-y-1">
-             <h2 class="text-2xl font-bold tracking-tight text-white">{{ loggedIn ? '认证通过' : (qrStatus || '准备就绪') }}</h2>
-             <p class="text-zinc-500 text-sm italic">{{ loggedIn ? `就诊人: ${members.length} 位已就位` : '使用微信扫一扫以确认身份' }}</p>
+             <h2 class="text-2xl font-bold tracking-tight text-slate-900">{{ loggedIn ? '认证通过' : (qrStatus || '准备就绪') }}</h2>
+             <p class="text-slate-500 text-sm italic">{{ loggedIn ? `就诊人: ${members.length} 位已就位` : '使用微信扫一扫以确认身份' }}</p>
           </div>
 
           <NeonButton 
@@ -182,34 +182,34 @@ const proxySubmitEnabled = computed(() => {
            <div class="space-y-6">
               <div class="flex justify-between items-center group">
                  <div class="space-y-1">
-                    <span class="text-zinc-500 text-xs font-bold uppercase tracking-widest">预约配置</span>
-                    <h4 class="text-white font-semibold flex items-center gap-2">
+                    <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">预约配置</span>
+                    <h4 class="text-slate-900 font-semibold flex items-center gap-2">
                        {{ configSummary !== '暂无配置' ? configSummary : '等待完善配置' }}
                        <StatusBadge v-if="configSummary !== '暂无配置'" variant="info" size="xs">READY</StatusBadge>
                     </h4>
                  </div>
-                 <button @click="$emit('navigate', 'config')" class="p-2 rounded-full hover:bg-white/5 transition-colors text-zinc-500 hover:text-white">
+                 <button @click="$emit('navigate', 'config')" class="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400 hover:text-blue-600">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                  </button>
               </div>
 
               <div class="grid grid-cols-2 gap-4">
-                 <div class="p-5 bg-zinc-900/40 rounded-2xl border border-white/[0.03] space-y-2 hover:border-white/10 transition-colors">
-                    <div class="flex items-center gap-2 text-zinc-500">
+                 <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 hover:border-blue-200 transition-colors">
+                    <div class="flex items-center gap-2 text-slate-500">
                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                        <span class="text-[10px] font-black uppercase tracking-tighter">预约日期</span>
                     </div>
-                    <div class="text-zinc-200 text-lg font-bold tracking-tight">
+                    <div class="text-slate-800 text-lg font-bold tracking-tight">
                        {{ targetDates[0] || '未指定' }}
-                       <span v-if="targetDates.length > 1" class="text-blue-500 text-xs font-medium">+{{ targetDates.length - 1 }} 天</span>
+                       <span v-if="targetDates.length > 1" class="text-blue-600 text-xs font-medium">+{{ targetDates.length - 1 }} 天</span>
                     </div>
                  </div>
-                 <div class="p-5 bg-zinc-900/40 rounded-2xl border border-white/[0.03] space-y-2 hover:border-white/10 transition-colors">
-                    <div class="flex items-center gap-2 text-zinc-500">
+                 <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 hover:border-blue-200 transition-colors">
+                    <div class="flex items-center gap-2 text-slate-500">
                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                        <span class="text-[10px] font-black uppercase tracking-tighter">提交模式</span>
                     </div>
-                    <div class="text-zinc-200 text-lg font-bold tracking-tight">
+                    <div class="text-slate-800 text-lg font-bold tracking-tight">
                        {{ proxySubmitEnabled ? '云端模拟' : '直链提交' }}
                     </div>
                  </div>
@@ -230,7 +230,7 @@ const proxySubmitEnabled = computed(() => {
                     {{ grabBtnLabel }}
                  </span>
                </NeonButton>
-               <p class="text-center text-xs text-zinc-500 font-medium">
+               <p class="text-center text-xs text-slate-400 font-medium">
                   由 Skyline 极速引擎驱动，当前任务已自动校准服务器时间。
                </p>
            </div>
@@ -240,21 +240,61 @@ const proxySubmitEnabled = computed(() => {
       <!-- Quick Info Bar -->
       <div class="lg:col-span-12">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-           <div v-for="(step, idx) in [
-              { title: '身份认证', desc: '微信扫码接入', color: 'blue' },
-              { title: '极速预置', desc: '毫秒级配置同步', color: 'indigo' },
-              { title: '全时守候', desc: '云端监控及时递交', color: 'emerald' }
-           ]" :key="idx" class="glass-panel p-6 rounded-3xl flex items-center gap-5 hover:bg-zinc-800/50 transition-all cursor-default overflow-hidden relative">
-              <div :class="[`w-14 h-14 rounded-2xl bg-${step.color}-500/10 flex items-center justify-center text-2xl font-black text-${step.color}-500`]">
-                 {{ idx + 1 }}
+           <!-- Dynamic Status Blocks -->
+           <!-- 1. Identity -->
+           <div :class="['glass-panel p-6 rounded-3xl flex items-center gap-5 transition-all cursor-default overflow-hidden relative border',
+               loggedIn ? 'bg-emerald-50 border-emerald-100' : 'hover:bg-white/80 border-transparent']">
+              <div :class="['w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black',
+                  loggedIn ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-blue-50 text-blue-500']">
+                 1
               </div>
               <div class="flex-1">
-                 <h4 class="text-zinc-100 font-bold tracking-tight">{{ step.title }}</h4>
-                 <p class="text-zinc-500 text-xs">{{ step.desc }}</p>
+                 <h4 :class="['font-bold tracking-tight', loggedIn ? 'text-emerald-800' : 'text-slate-800']">
+                    {{ loggedIn ? '身份认证完成' : '身份认证' }}
+                 </h4>
+                 <p :class="['text-xs', loggedIn ? 'text-emerald-600/80' : 'text-slate-500']">
+                    {{ loggedIn ? '已连接至 91160 核心服务' : '微信扫码接入' }}
+                 </p>
               </div>
-              <!-- Subtle accent glow -->
-              <div :class="[`absolute -right-4 -bottom-4 w-16 h-16 bg-${step.color}-500/5 blur-2xl rounded-full`]"></div>
+              <div v-if="loggedIn" class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/10 blur-2xl rounded-full"></div>
            </div>
+
+           <!-- 2. Config -->
+           <div :class="['glass-panel p-6 rounded-3xl flex items-center gap-5 transition-all cursor-default overflow-hidden relative border',
+               configSummary !== '暂无配置' ? 'bg-emerald-50 border-emerald-100' : 'hover:bg-white/80 border-transparent']">
+              <div :class="['w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black',
+                  configSummary !== '暂无配置' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-indigo-50 text-indigo-500']">
+                 2
+              </div>
+              <div class="flex-1">
+                 <h4 :class="['font-bold tracking-tight', configSummary !== '暂无配置' ? 'text-emerald-800' : 'text-slate-800']">
+                    {{ configSummary !== '暂无配置' ? '目标已锁定' : '极速预置' }}
+                 </h4>
+                 <p :class="['text-xs', configSummary !== '暂无配置' ? 'text-emerald-600/80' : 'text-slate-500']">
+                    {{ configSummary !== '暂无配置' ? '配置已同步，策略引擎就绪' : '毫秒级配置同步' }}
+                 </p>
+              </div>
+              <div v-if="configSummary !== '暂无配置'" class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/10 blur-2xl rounded-full"></div>
+           </div>
+
+           <!-- 3. Monitoring -->
+           <div :class="['glass-panel p-6 rounded-3xl flex items-center gap-5 transition-all cursor-default overflow-hidden relative border',
+               grabRunning ? 'bg-emerald-50 border-emerald-100' : 'hover:bg-white/80 border-transparent']">
+              <div :class="['w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black',
+                  grabRunning ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-cyan-50 text-cyan-500']">
+                 3
+              </div>
+              <div class="flex-1">
+                 <h4 :class="['font-bold tracking-tight', grabRunning ? 'text-emerald-800' : 'text-slate-800']">
+                    {{ grabRunning ? '全网监控中' : '全时守候' }}
+                 </h4>
+                 <p :class="['text-xs', grabRunning ? 'text-emerald-600/80' : 'text-slate-500']">
+                    {{ grabRunning ? '正在实时扫描号源...' : '云端监控及时递交' }}
+                 </p>
+              </div>
+              <div v-if="grabRunning" class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/10 blur-2xl rounded-full animate-pulse"></div>
+           </div>
+
         </div>
       </div>
     </div>
