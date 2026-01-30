@@ -189,7 +189,9 @@ impl HealthClient {
         let city = if city_id.is_empty() { "5" } else { city_id };
 
         let mut headers = Self::default_headers();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8"));
+        headers.insert(REFERER, HeaderValue::from_static("https://www.91160.com/"));
+        headers.insert(ORIGIN, HeaderValue::from_static("https://www.91160.com"));
 
         let resp = self
             .client
@@ -199,11 +201,7 @@ impl HealthClient {
             .send()
             .await?;
 
-
-
         let text = resp.text().await?;
-        println!(">>> Debug: Raw hospitals response: {}", text);
-        
         let data: Vec<Hospital> = serde_json::from_str(&text)?;
         Ok(data)
     }
@@ -211,7 +209,9 @@ impl HealthClient {
     /// Get departments by unit
     pub async fn get_deps_by_unit(&self, unit_id: &str) -> AppResult<Vec<Department>> {
         let mut headers = Self::default_headers();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8"));
+        headers.insert(REFERER, HeaderValue::from_static("https://www.91160.com/"));
+        headers.insert(ORIGIN, HeaderValue::from_static("https://www.91160.com"));
 
         let resp = self
             .client
@@ -221,11 +221,7 @@ impl HealthClient {
             .send()
             .await?;
 
-
-
         let text = resp.text().await?;
-        println!(">>> Debug: Raw deps response: {}", text);
-
         let data: Vec<Department> = serde_json::from_str(&text)?;
         Ok(data)
     }

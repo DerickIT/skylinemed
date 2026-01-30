@@ -1,4 +1,4 @@
-//! Type definitions for QuickDoctor
+//! Type definitions for SkylineMed
 //! Corresponds to core/types.go
 
 use serde::{Deserialize, Serialize};
