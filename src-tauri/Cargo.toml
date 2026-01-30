@@ -1,8 +1,8 @@
 [package]
-name = "quick-doctor"
+name = "skylinemed"
 version = "0.1.0"
-description = "医院挂号助手 - Hospital Appointment Assistant"
-authors = ["QuickDoctor Team"]
+description = "天际医航 - SkylineMed Hospital Appointment Assistant"
+authors = ["Skyline Smart Link Tech"]
 edition = "2021"
 
 [lib]

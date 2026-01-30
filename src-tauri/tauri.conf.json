@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "QuickDoctor",
+  "productName": "SkylineMed",
   "version": "0.1.0",
-  "identifier": "com.quickdoctor.app",
+  "identifier": "com.skylinemed.app",
   "build": {
     "beforeDevCommand": "npm run dev --prefix ../frontend",
     "devUrl": "http://localhost:5173",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "QuickDoctor",
+        "title": "SkylineMed - 天际医航",
         "width": 1024,
         "height": 768,
         "resizable": true,
