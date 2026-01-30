@@ -5,9 +5,9 @@ import {
     StopQRLogin,
     GetUserState,
     SaveUserState,
-    GetMembers
-} from '../../wailsjs/go/main/App'
-import { EventsOn } from '../../wailsjs/runtime'
+    GetMembers,
+    EventsOn
+} from '../api/tauri'
 import { useLogger } from './useLogger'
 
 // Global Auth State
