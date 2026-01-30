@@ -14,7 +14,7 @@ use url::Url;
 
 use super::cookies::{has_access_hash, load_cookie_file, save_cookie_file, unique_strings};
 use super::errors::{AppError, AppResult};
-use super::types::{CookieRecord, Department, DepartmentCategory, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital};
+use super::types::{CookieRecord, DepartmentCategory, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -215,32 +215,54 @@ impl HealthClient {
     }
 
     /// Get departments by unit
-    pub async fn get_deps_by_unit(&self, unit_id: &str) -> AppResult<Vec<Department>> {
+    /// city_pinyin is used to construct the correct subdomain (e.g., "sz" -> "sz.91160.com")
+    pub async fn get_deps_by_unit(&self, unit_id: &str, city_pinyin: &str) -> AppResult<Vec<DepartmentCategory>> {
+        // Use city pinyin as subdomain, fallback to "www" if empty
+        let subdomain = if city_pinyin.is_empty() { "www" } else { city_pinyin };
+        let url = format!("https://{}.91160.com/ajax/getdepbyunit.html", subdomain);
+        
+        println!(">>> [get_deps_by_unit] Request URL: {}", url);
+        println!(">>> [get_deps_by_unit] Request body: keyValue={}", unit_id);
+        
         let mut headers = Self::default_headers();
         headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8"));
-        headers.insert(REFERER, HeaderValue::from_static("https://www.91160.com/"));
-        headers.insert(ORIGIN, HeaderValue::from_static("https://www.91160.com"));
+        
+        // Dynamic Referer and Origin based on subdomain
+        let referer = format!("https://{}.91160.com/", subdomain);
+        let origin = format!("https://{}.91160.com", subdomain);
+        headers.insert(REFERER, HeaderValue::from_str(&referer).unwrap_or(HeaderValue::from_static("https://www.91160.com/")));
+        headers.insert(ORIGIN, HeaderValue::from_str(&origin).unwrap_or(HeaderValue::from_static("https://www.91160.com")));
 
         let resp = self
             .client
-            .post("https://www.91160.com/ajax/getdepbyunit.html")
+            .post(&url)
             .headers(headers)
             .form(&[("keyValue", unit_id)])
             .send()
             .await?;
 
+        let status = resp.status();
+        println!(">>> [get_deps_by_unit] Response status: {}", status);
+        
         let text = resp.text().await?;
+        // Print first 500 chars of response for debugging
+        let preview = if text.len() > 500 { &text[..500] } else { &text };
+        println!(">>> [get_deps_by_unit] Response body (preview): {}", preview);
         
         // API returns: [{pubcat, yuyue_num, childs: [departments]}]
-        // We need to flatten to get all departments from all categories
-        let categories: Vec<DepartmentCategory> = serde_json::from_str(&text)?;
-        let departments: Vec<Department> = categories
-            .into_iter()
-            .flat_map(|cat| cat.childs)
-            .collect();
-        
-        Ok(departments)
+        // We return the raw category structure so frontend can handle hierarchy
+        match serde_json::from_str::<Vec<DepartmentCategory>>(&text) {
+            Ok(categories) => {
+                println!(">>> [get_deps_by_unit] Parsed {} categories successfully", categories.len());
+                Ok(categories)
+            }
+            Err(e) => {
+                println!(">>> [get_deps_by_unit] JSON parse error: {}", e);
+                println!(">>> [get_deps_by_unit] Full response: {}", text);
+                Err(AppError::JsonError(e))
+            }
+        }
     }
 
     /// Get members (patients)
