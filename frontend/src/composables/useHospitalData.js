@@ -4,7 +4,7 @@ import {
     GetHospitalsByCity,
     GetDepsByUnit,
     GetSchedule
-} from '../../wailsjs/go/main/App'
+} from '../api/tauri'
 import { useLogger } from './useLogger'
 import { useAuth } from './useAuth'
 

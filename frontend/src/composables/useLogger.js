@@ -1,6 +1,5 @@
 import { ref, reactive, computed } from 'vue'
-import { ExportLogs } from '../../wailsjs/go/main/App'
-import { EventsOn } from '../../wailsjs/runtime'
+import { ExportLogs, EventsOn } from '../api/tauri'
 
 // Global state to share logs across components
 const logs = ref([])

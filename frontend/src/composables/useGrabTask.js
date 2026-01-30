@@ -1,6 +1,5 @@
 import { ref } from 'vue'
-import { StartGrab, StopGrab } from '../../wailsjs/go/main/App'
-import { EventsOn } from '../../wailsjs/runtime'
+import { StartGrab, StopGrab, EventsOn } from '../api/tauri'
 import { useLogger } from './useLogger'
 
 // Task Configuration State
