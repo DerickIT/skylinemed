@@ -14,7 +14,7 @@ use url::Url;
 
 use super::cookies::{has_access_hash, load_cookie_file, save_cookie_file, unique_strings};
 use super::errors::{AppError, AppResult};
-use super::types::{CookieRecord, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital, Department};
+use super::types::{CookieRecord, Department, DepartmentCategory, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -231,8 +231,16 @@ impl HealthClient {
             .await?;
 
         let text = resp.text().await?;
-        let data: Vec<Department> = serde_json::from_str(&text)?;
-        Ok(data)
+        
+        // API returns: [{pubcat, yuyue_num, childs: [departments]}]
+        // We need to flatten to get all departments from all categories
+        let categories: Vec<DepartmentCategory> = serde_json::from_str(&text)?;
+        let departments: Vec<Department> = categories
+            .into_iter()
+            .flat_map(|cat| cat.childs)
+            .collect();
+        
+        Ok(departments)
     }
 
     /// Get members (patients)
