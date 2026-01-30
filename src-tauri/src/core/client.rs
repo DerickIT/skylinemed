@@ -14,7 +14,7 @@ use url::Url;
 
 use super::cookies::{has_access_hash, load_cookie_file, save_cookie_file, unique_strings};
 use super::errors::{AppError, AppResult};
-use super::types::{CookieRecord, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital, Department, City};
+use super::types::{CookieRecord, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital, Department};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -146,10 +146,18 @@ impl HealthClient {
     /// Build default headers
     fn default_headers() -> HeaderMap {
         let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, HeaderValue::from_static(DEFAULT_USER_AGENT));
-        headers.insert(ACCEPT, HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"));
+        headers.insert(USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json, text/javascript, */*; q=0.01"));
         headers.insert("Accept-Language", HeaderValue::from_static("zh-CN,zh;q=0.9,en;q=0.8"));
-        headers.insert("Accept-Encoding", HeaderValue::from_static("gzip, deflate, br"));
+        // headers.insert("Accept-Encoding", HeaderValue::from_static("gzip, deflate, br")); // Checked: reqwest adds this automatically
+        headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
+        headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("empty"));
+        headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("cors"));
+        headers.insert("Sec-Fetch-Site", HeaderValue::from_static("same-origin"));
+        headers.insert("sec-ch-ua", HeaderValue::from_static("\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\""));
+        headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
+        headers.insert("sec-ch-ua-platform", HeaderValue::from_static("\"Windows\""));
+        headers.insert("DNT", HeaderValue::from_static("1"));
         headers
     }
 
@@ -191,7 +199,12 @@ impl HealthClient {
             .send()
             .await?;
 
-        let data: Vec<Hospital> = resp.json().await?;
+
+
+        let text = resp.text().await?;
+        println!(">>> Debug: Raw hospitals response: {}", text);
+        
+        let data: Vec<Hospital> = serde_json::from_str(&text)?;
         Ok(data)
     }
 
@@ -208,7 +221,12 @@ impl HealthClient {
             .send()
             .await?;
 
-        let data: Vec<Department> = resp.json().await?;
+
+
+        let text = resp.text().await?;
+        println!(">>> Debug: Raw deps response: {}", text);
+
+        let data: Vec<Department> = serde_json::from_str(&text)?;
         Ok(data)
     }
 

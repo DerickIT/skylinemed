@@ -186,19 +186,39 @@ fn default_path() -> String {
     "/".into()
 }
 
-/// City information
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct City {
-    #[serde(rename = "cityId")]
+    #[serde(rename = "cityId", deserialize_with = "deserialize_flexible_string")]
     pub city_id: String,
     pub name: String,
+}
+
+/// Custom deserializer for fields that can be number or string
+fn deserialize_flexible_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrInt {
+        String(String),
+        Int(i64),
+        Float(f64),
+    }
+
+    match StringOrInt::deserialize(deserializer)? {
+        StringOrInt::String(s) => Ok(s),
+        StringOrInt::Int(i) => Ok(i.to_string()),
+        StringOrInt::Float(f) => Ok(f.to_string()),
+    }
 }
 
 /// Hospital information
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hospital {
+    #[serde(deserialize_with = "deserialize_flexible_string")]
     pub unit_id: String,
     pub unit_name: String,
 }
@@ -207,6 +227,7 @@ pub struct Hospital {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Department {
+    #[serde(deserialize_with = "deserialize_flexible_string")]
     pub dep_id: String,
     pub dep_name: String,
     #[serde(default)]
@@ -224,6 +245,7 @@ pub struct LogEntry {
 /// Schedule slot information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduleSlot {
+    #[serde(deserialize_with = "deserialize_flexible_string")]
     pub schedule_id: String,
     pub time_type: String,
     pub time_type_desc: String,
@@ -234,15 +256,16 @@ pub struct ScheduleSlot {
 /// Doctor with schedule information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DoctorSchedule {
+    #[serde(deserialize_with = "deserialize_flexible_string")]
     pub doctor_id: String,
     pub doctor_name: String,
     #[serde(default)]
     pub reg_fee: String,
     #[serde(default)]
     pub total_left_num: i32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_flexible_string")]
     pub his_doc_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_flexible_string")]
     pub his_dep_id: String,
     #[serde(default)]
     pub schedules: Vec<ScheduleSlot>,

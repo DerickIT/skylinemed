@@ -69,6 +69,7 @@ pub fn logs_dir() -> AppResult<PathBuf> {
 }
 
 /// Check if a file exists
+#[allow(dead_code)]
 pub fn file_exists(path: &PathBuf) -> bool {
     path.exists() && path.is_file()
 }
