@@ -17,3 +17,4 @@ task.md
 walkthrough.md
 implementation_plan.md
 src-tauri/target/*
+src-tauri/config/cookies.json

@@ -187,11 +187,18 @@ fn default_path() -> String {
 }
 
 #[allow(dead_code)]
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct City {
     #[serde(rename = "cityId", deserialize_with = "deserialize_flexible_string")]
     pub city_id: String,
     pub name: String,
+    #[serde(rename = "match", default)]
+    pub match_key: String,
+    #[serde(default)]
+    pub pinyin: String,
+    #[serde(default)]
+    pub sanzima: String,
 }
 
 /// Custom deserializer for fields that can be number or string

@@ -240,6 +240,26 @@ const clearPreciseSelection = () => {
   manualTimeInput.value = ''
 }
 
+// Initialize default dates
+const today = new Date()
+const nextWeek = new Date(today)
+nextWeek.setDate(today.getDate() + 7)
+
+const formatDate = (date) => {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+}
+
+if (!dateInput.value && targetDates.value.length === 0) {
+    dateInput.value = formatDate(nextWeek)
+}
+
+if (!checkScheduleDate.value) {
+    checkScheduleDate.value = formatDate(today)
+}
+
 </script>
 
 <template>
@@ -265,6 +285,7 @@ const clearPreciseSelection = () => {
                    placeholder="搜索城市..."
                    :loading="loadingCities"
                    :disabled="!loginChecked || !loggedIn"
+                   :additional-search-fields="['match', 'pinyin', 'sanzima']"
                 />
                 
                 <Combobox
