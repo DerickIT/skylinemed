@@ -144,8 +144,8 @@ watch(filteredOptions, () => {
 </script>
 
 <template>
-  <div ref="containerRef" class="relative group">
-    <label v-if="label" class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{{ label }}</label>
+  <div ref="containerRef" class="relative group/combo">
+    <label v-if="label" class="block text-[10px] font-black uppercase text-slate-400 tracking-[0.3em] mb-3 ml-1 font-display">{{ label }}</label>
     
     <div class="relative">
       <input
@@ -154,43 +154,54 @@ watch(filteredOptions, () => {
         @input="handleInput"
         @focus="handleFocus"
         @keydown="onKeyDown"
-        :placeholder="placeholder || '请选择...'"
+        :placeholder="placeholder || '请通过关键字搜索锁定目标...'"
         :disabled="disabled"
-        class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none hover:bg-white transition-all text-slate-700 font-medium placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+        class="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] px-8 py-5 text-base focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 outline-none hover:bg-white transition-all text-slate-900 font-display font-black placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed pr-14 shadow-sm"
       />
       
-      <div v-if="loading" class="absolute right-4 top-1/2 -translate-y-1/2">
-        <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      </div>
-      <div v-else-if="modelValue && !disabled" @click="handleClear" class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-300 hover:text-slate-500 p-1">
-         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-      </div>
-      <div v-else class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-         <svg class="w-4 h-4 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+      <!-- Icons -->
+      <div class="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
+        <div v-if="loading" class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <div v-else-if="modelValue && !disabled" @click="handleClear" class="cursor-pointer text-slate-300 hover:text-red-500 p-1 transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+        </div>
+        <div v-else class="text-slate-300 group-hover/combo:text-blue-500 transition-colors pointer-events-none">
+          <svg v-if="isOpen" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7" /></svg>
+          <svg v-else class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+        </div>
       </div>
     </div>
 
     <!-- Dropdown -->
-    <Transition name="fade-up">
-      <div v-if="isOpen && !disabled" class="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto custom-scrollbar p-1">
-        <ul v-if="filteredOptions.length > 0">
-           <li 
-             v-for="(option, index) in filteredOptions" 
-             :key="option[keyField]"
-             @click="selectOption(option)"
-             @mousemove="highlightIndex = index"
-             :class="['px-4 py-2.5 rounded-xl cursor-pointer text-sm font-medium transition-colors flex justify-between items-center', 
-               index === highlightIndex ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50']"
-           >
-              <span>{{ option[labelField] }}</span>
-              <svg v-if="modelValue === option[keyField]" class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-           </li>
-        </ul>
-        <div v-else class="px-4 py-8 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">
-            {{ searchQuery ? '无匹配结果' : '无数据' }}
+    <Transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0 translate-y-4 scale-95"
+      enter-to-class="opacity-100 translate-y-0 scale-100"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0 scale-100"
+      leave-to-class="opacity-0 translate-y-4 scale-95"
+    >
+      <div v-if="isOpen && !disabled" class="absolute z-50 w-full mt-4 bg-white/90 backdrop-blur-xl border border-slate-100 rounded-[32px] shadow-2xl shadow-slate-200/60 overflow-hidden">
+        <div class="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
+          <div v-if="filteredOptions.length === 0" class="py-12 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest italic font-display">
+            {{ searchQuery ? 'No Matching Targets' : 'System Ready / Idle' }}
+          </div>
+          <ul v-else>
+            <li
+              v-for="(option, index) in filteredOptions"
+              :key="option[keyField]"
+              @click="selectOption(option)"
+              @mousemove="highlightIndex = index"
+              :class="[
+                'w-full text-left px-6 py-4 rounded-2xl text-sm font-bold transition-all flex items-center justify-between group/item cursor-pointer',
+                index === highlightIndex ? 'bg-slate-950 text-white translate-x-1' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              ]"
+            >
+              <span class="font-display">{{ option[labelField] }}</span>
+              <div v-if="modelValue === option[keyField]" class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3B82F6]"></div>
+              <svg v-else class="w-5 h-5 opacity-0 group-hover/item:opacity-100 transition-opacity text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+            </li>
+          </ul>
         </div>
       </div>
     </Transition>
@@ -198,14 +209,6 @@ watch(filteredOptions, () => {
 </template>
 
 <style scoped>
-.fade-up-enter-active, .fade-up-leave-active {
-  transition: all 0.2s ease-out;
-}
-.fade-up-enter-from, .fade-up-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
