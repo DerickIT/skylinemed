@@ -118,104 +118,196 @@ const proxySubmitEnabled = computed(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
-    <!-- Status Card -->
-    <GlassCard title="运行状态" className="h-full">
-      <div class="flex flex-col items-center justify-center p-6 space-y-4">
-        
-        <div class="relative">
-           <div :class="['flex items-center justify-center border-4 shadow-xl overflow-hidden transition-all duration-300', 
-              loggedIn ? 'w-32 h-32 rounded-full border-emerald-500/50 shadow-emerald-500/20' : 'w-48 h-48 rounded-xl border-indigo-500/50 shadow-indigo-500/20 bg-white']">
-              <img v-if="qrImageUrl && !loggedIn" :src="qrImageUrl" class="w-full h-full object-contain p-2" />
-              <div v-else class="text-4xl font-bold text-white/20">
-                 {{ loggedIn ? 'OK' : 'QR' }}
+  <div class="space-y-8 pb-24">
+    <!-- Luxury Header -->
+    <header class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">
+          {{ loggedIn ? '欢迎回来，天际医航' : '开启便捷就医之旅' }}
+        </h1>
+        <p class="text-slate-500 max-w-lg">
+          {{ loggedIn ? '系统已准备就绪，随时可以进行号源锁定与极速预约。' : '请先扫码登录，然后配置您的预约目标，我们会为您实时监控。' }}
+        </p>
+      </div>
+      <div v-if="loggedIn" class="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full animate-pulse-subtle">
+        <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+        <span class="text-xs font-semibold text-emerald-600 uppercase tracking-widest">服务连接正常</span>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Status Card -->
+      <GlassCard title="账号状态" className="lg:col-span-5 h-full">
+        <div class="flex flex-col items-center justify-center py-6 space-y-6">
+          <div class="relative group">
+            <div :class="['flex items-center justify-center border-[6px] transition-all duration-700 ease-in-out overflow-hidden', 
+                loggedIn 
+                  ? 'w-36 h-36 rounded-full border-white shadow-[0_20px_50px_rgba(0,0,0,0.1)] scale-100 opacity-100' 
+                  : 'w-56 h-56 rounded-3xl border-slate-100 bg-white shadow-xl scale-100']">
+                <img v-if="qrImageUrl && !loggedIn" :src="qrImageUrl" class="w-full h-full object-contain p-4" />
+                <div v-else class="flex items-center justify-center w-full h-full bg-slate-50">
+                   <svg v-if="loggedIn" class="w-16 h-16 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                   </svg>
+                   <svg v-else class="w-20 h-20 text-blue-500/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                   </svg>
+                </div>
+            </div>
+            <!-- Glow effect behind QR -->
+            <div v-if="!loggedIn && qrImageUrl" class="absolute -inset-4 bg-blue-500/10 blur-xl -z-10 rounded-full animate-float opacity-70"></div>
+          </div>
+          
+          <div class="text-center space-y-1">
+             <h2 class="text-2xl font-bold tracking-tight text-slate-900">{{ loggedIn ? '认证通过' : (qrStatus || '准备就绪') }}</h2>
+             <p class="text-slate-500 text-sm italic">{{ loggedIn ? `就诊人: ${members.length} 位已就位` : '使用微信扫一扫以确认身份' }}</p>
+          </div>
+
+          <NeonButton 
+            :variant="loggedIn ? 'ghost' : 'primary'" 
+            :disabled="loggedIn"
+            @click="toggleLogin" 
+            :loading="loginRunning && !qrImageUrl"
+            size="lg"
+            class="min-w-[180px]"
+          >
+             {{ loggedIn ? '已保持在线' : loginBtnLabel }}
+          </NeonButton>
+        </div>
+      </GlassCard>
+
+      <!-- Task Control -->
+      <GlassCard title="任务面板" className="lg:col-span-7 h-full">
+        <div class="flex flex-col justify-between h-full min-h-[300px]">
+           <div class="space-y-6">
+              <div class="flex justify-between items-center group">
+                 <div class="space-y-1">
+                    <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">预约配置</span>
+                    <h4 class="text-slate-900 font-semibold flex items-center gap-2">
+                       {{ configSummary !== '暂无配置' ? configSummary : '等待完善配置' }}
+                       <StatusBadge v-if="configSummary !== '暂无配置'" variant="info" size="xs">READY</StatusBadge>
+                    </h4>
+                 </div>
+                 <button @click="$emit('navigate', 'config')" class="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400 hover:text-blue-600">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                 </button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                 <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 hover:border-blue-200 transition-colors">
+                    <div class="flex items-center gap-2 text-slate-500">
+                       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                       <span class="text-[10px] font-black uppercase tracking-tighter">预约日期</span>
+                    </div>
+                    <div class="text-slate-800 text-lg font-bold tracking-tight">
+                       {{ targetDates[0] || '未指定' }}
+                       <span v-if="targetDates.length > 1" class="text-blue-600 text-xs font-medium">+{{ targetDates.length - 1 }} 天</span>
+                    </div>
+                 </div>
+                 <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 hover:border-blue-200 transition-colors">
+                    <div class="flex items-center gap-2 text-slate-500">
+                       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                       <span class="text-[10px] font-black uppercase tracking-tighter">提交模式</span>
+                    </div>
+                    <div class="text-slate-800 text-lg font-bold tracking-tight">
+                       {{ proxySubmitEnabled ? '云端模拟' : '直链提交' }}
+                    </div>
+                 </div>
               </div>
            </div>
-           <div v-if="loggedIn" class="absolute bottom-1 right-1 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-slate-900">
-              <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+           
+           <div class="mt-8 space-y-4">
+               <NeonButton 
+                 size="lg" 
+                 :variant="grabBtnVariant" 
+                 @click="handleToggleGrab" 
+                 block
+                 class="h-16 text-lg"
+               >
+                 <span class="flex items-center gap-2">
+                    <svg v-if="!grabRunning" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    {{ grabBtnLabel }}
+                 </span>
+               </NeonButton>
+               <p class="text-center text-xs text-slate-400 font-medium">
+                  由 Skyline 极速引擎驱动，当前任务已自动校准服务器时间。
+               </p>
            </div>
         </div>
-        
-        <div class="text-center">
-           <h2 class="text-xl font-bold text-white mb-1">{{ loggedIn ? '已登录' : (qrStatus || '等待登录') }}</h2>
-           <p class="text-sm text-slate-400">{{ loggedIn ? `就诊人: ${members.length} 位` : '请使用微信扫码登录' }}</p>
-        </div>
-
-        <NeonButton 
-          :variant="loggedIn ? 'success' : 'primary'" 
-          :disabled="loggedIn"
-          @click="toggleLogin" 
-          :loading="loginRunning && !qrImageUrl"
-        >
-           {{ loginBtnLabel }}
-        </NeonButton>
-      </div>
-    </GlassCard>
-
-    <!-- Task Control -->
-    <GlassCard title="抢号控制" className="h-full">
-      <div class="flex flex-col justify-between h-full space-y-6">
-         <div>
-            <div class="flex justify-between items-center mb-4">
-               <span class="text-slate-400 text-sm">当前配置</span>
-               <StatusBadge :variant="configSummary !== '暂无配置' ? 'info' : 'neutral'">{{ configSummary !== '暂无配置' ? 'Ready' : 'Empty' }}</StatusBadge>
-            </div>
-            <div class="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2">
-               <div class="flex justify-between">
-                  <span class="text-slate-500 text-xs uppercase tracking-wider">Target</span>
-                  <span class="text-slate-200 text-sm font-medium">{{ configSummary }}</span>
-               </div>
-               <div class="flex justify-between">
-                  <span class="text-slate-500 text-xs uppercase tracking-wider">Date</span>
-                  <span class="text-slate-200 text-sm font-medium">{{ targetDates[0] || '未选择' }}</span>
-               </div>
-            </div>
-         </div>
-         
-         <div class="flex flex-col gap-3">
-             <NeonButton 
-               size="lg" 
-               :variant="grabBtnVariant" 
-               @click="handleToggleGrab" 
-               :loading="false" 
-               block
-             >
-               {{ grabBtnLabel }}
-             </NeonButton>
-             <p class="text-center text-xs text-slate-500">
-                请确保在配置面板中选择了正确的医院和日期
-             </p>
-         </div>
-      </div>
-    </GlassCard>
-    
-    <!-- Info -->
-    <div class="md:col-span-2">
-      <GlassCard title="快速指南" noPadding>
-         <div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/5">
-            <div class="p-4 hover:bg-white/5 transition-colors cursor-pointer group" @click="$emit('navigate', 'dashboard')">
-               <div class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <span class="text-emerald-400 font-bold">1</span>
-               </div>
-               <h4 class="font-medium text-slate-200 mb-1">扫码登录</h4>
-               <p class="text-xs text-slate-500">使用微信扫码，确保状态显示“已登录”。</p>
-            </div>
-            <div class="p-4 hover:bg-white/5 transition-colors cursor-pointer group"  @click="$emit('navigate', 'config')">
-               <div class="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <span class="text-indigo-400 font-bold">2</span>
-               </div>
-               <h4 class="font-medium text-slate-200 mb-1">配置任务</h4>
-               <p class="text-xs text-slate-500">选择医院、科室、医生以及就诊日期。</p>
-            </div>
-            <div class="p-4 hover:bg-white/5 transition-colors cursor-pointer group"  @click="$emit('navigate', 'logs')">
-               <div class="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <span class="text-rose-400 font-bold">3</span>
-               </div>
-               <h4 class="font-medium text-slate-200 mb-1">启动抢号</h4>
-               <p class="text-xs text-slate-500">点击开始，在日志监控中查看实时进度。</p>
-            </div>
-         </div>
       </GlassCard>
+      
+      <!-- Quick Info Bar -->
+      <div class="lg:col-span-12">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+           <!-- Dynamic Status Blocks -->
+           <!-- 1. Identity -->
+           <div :class="['glass-panel p-6 rounded-3xl flex items-center gap-5 transition-all cursor-default overflow-hidden relative border',
+               loggedIn ? 'bg-emerald-50 border-emerald-100' : 'hover:bg-white/80 border-transparent']">
+              <div :class="['w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black',
+                  loggedIn ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-blue-50 text-blue-500']">
+                 1
+              </div>
+              <div class="flex-1">
+                 <h4 :class="['font-bold tracking-tight', loggedIn ? 'text-emerald-800' : 'text-slate-800']">
+                    {{ loggedIn ? '身份认证完成' : '身份认证' }}
+                 </h4>
+                 <p :class="['text-xs', loggedIn ? 'text-emerald-600/80' : 'text-slate-500']">
+                    {{ loggedIn ? '已连接至 91160 核心服务' : '微信扫码接入' }}
+                 </p>
+              </div>
+              <div v-if="loggedIn" class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/10 blur-2xl rounded-full"></div>
+           </div>
+
+           <!-- 2. Config -->
+           <div :class="['glass-panel p-6 rounded-3xl flex items-center gap-5 transition-all cursor-default overflow-hidden relative border',
+               configSummary !== '暂无配置' ? 'bg-emerald-50 border-emerald-100' : 'hover:bg-white/80 border-transparent']">
+              <div :class="['w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black',
+                  configSummary !== '暂无配置' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-indigo-50 text-indigo-500']">
+                 2
+              </div>
+              <div class="flex-1">
+                 <h4 :class="['font-bold tracking-tight', configSummary !== '暂无配置' ? 'text-emerald-800' : 'text-slate-800']">
+                    {{ configSummary !== '暂无配置' ? '目标已锁定' : '极速预置' }}
+                 </h4>
+                 <p :class="['text-xs', configSummary !== '暂无配置' ? 'text-emerald-600/80' : 'text-slate-500']">
+                    {{ configSummary !== '暂无配置' ? '配置已同步，策略引擎就绪' : '毫秒级配置同步' }}
+                 </p>
+              </div>
+              <div v-if="configSummary !== '暂无配置'" class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/10 blur-2xl rounded-full"></div>
+           </div>
+
+           <!-- 3. Monitoring -->
+           <div :class="['glass-panel p-6 rounded-3xl flex items-center gap-5 transition-all cursor-default overflow-hidden relative border',
+               grabRunning ? 'bg-emerald-50 border-emerald-100' : 'hover:bg-white/80 border-transparent']">
+              <div :class="['w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black',
+                  grabRunning ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-cyan-50 text-cyan-500']">
+                 3
+              </div>
+              <div class="flex-1">
+                 <h4 :class="['font-bold tracking-tight', grabRunning ? 'text-emerald-800' : 'text-slate-800']">
+                    {{ grabRunning ? '全网监控中' : '全时守候' }}
+                 </h4>
+                 <p :class="['text-xs', grabRunning ? 'text-emerald-600/80' : 'text-slate-500']">
+                    {{ grabRunning ? '正在实时扫描号源...' : '云端监控及时递交' }}
+                 </p>
+              </div>
+              <div v-if="grabRunning" class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/10 blur-2xl rounded-full animate-pulse"></div>
+           </div>
+
+        </div>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+</style>

@@ -139,7 +139,13 @@ export function useHospitalData() {
         lastDepsUnitId.value = normalizedUnitId
         try {
             pushLog('info', '正在加载科室...')
-            const data = await GetDepsByUnit(String(unitIdVal))
+
+            // Look up city pinyin from selected city for correct API subdomain
+            const cityObj = cities.value?.find(c => String(c.cityId) === String(selectedCity.value))
+            const cityPinyin = cityObj?.pinyin || ''
+            pushLog('info', `正在根据城市拼音加载科室: ${cityPinyin || '默认(www)'} (医院ID: ${unitIdVal})`)
+
+            const data = await GetDepsByUnit(String(unitIdVal), cityPinyin)
             const items = []
             if (Array.isArray(data)) {
                 data.forEach((item) => {

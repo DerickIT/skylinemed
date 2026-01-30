@@ -1,4 +1,4 @@
-//! Path utilities for QuickDoctor
+//! Path utilities for SkylineMed
 //! Corresponds to core/paths.go
 
 use std::env;
@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use super::errors::{AppError, AppResult};
 
-const CONFIG_DIR_ENV: &str = "QUICKDOCTOR_CONFIG_DIR";
+const CONFIG_DIR_ENV: &str = "SKYLINEMED_CONFIG_DIR";
 
 /// Get the configuration directory
 pub fn config_dir() -> AppResult<PathBuf> {

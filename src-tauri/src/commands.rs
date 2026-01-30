@@ -137,12 +137,13 @@ pub async fn get_hospitals_by_city(
 pub async fn get_deps_by_unit(
     state: State<'_, AppState>,
     unit_id: String,
-) -> Result<Vec<crate::core::types::Department>, String> {
-    println!(">>> Command: get_deps_by_unit(id={})", unit_id);
+    city_pinyin: String,
+) -> Result<Vec<crate::core::types::DepartmentCategory>, String> {
+    println!(">>> Command: get_deps_by_unit(id={}, city={})", unit_id, city_pinyin);
     state.client.ensure_cookies_loaded().await;
     state
         .client
-        .get_deps_by_unit(&unit_id)
+        .get_deps_by_unit(&unit_id, &city_pinyin)
         .await
         .map_err(|e| e.to_string())
 }

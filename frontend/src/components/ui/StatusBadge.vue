@@ -11,21 +11,21 @@ const props = defineProps({
 
 const styles = computed(() => {
   const map = {
-    success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    warn: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    error: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-    info: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    neutral: 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+    success: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    warn: 'bg-amber-50 text-amber-600 border-amber-200',
+    error: 'bg-rose-50 text-rose-600 border-rose-200',
+    info: 'bg-blue-50 text-blue-600 border-blue-200',
+    neutral: 'bg-slate-50 text-slate-500 border-slate-200'
   }
   return map[props.variant] || map.neutral
 })
 
 const dotColor = computed(() => {
   const map = {
-    success: 'bg-emerald-400',
-    warn: 'bg-amber-400',
-    error: 'bg-rose-400',
-    info: 'bg-blue-400',
+    success: 'bg-emerald-500',
+    warn: 'bg-amber-500',
+    error: 'bg-rose-500',
+    info: 'bg-blue-500',
     neutral: 'bg-slate-400'
   }
   return map[props.variant] || map.neutral

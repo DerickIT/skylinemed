@@ -1,0 +1,14 @@
+{
+  "target_dates": [],
+  "proxy_submit_enabled": true,
+  "target_date": "2026-02-06",
+  "dep_id": null,
+  "member_id": null,
+  "doctor_id": null,
+  "city_id": "5",
+  "unit_id": null,
+  "time_slots": [
+    "am",
+    "pm"
+  ]
+}

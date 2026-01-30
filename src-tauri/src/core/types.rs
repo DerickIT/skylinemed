@@ -214,12 +214,35 @@ where
     }
 }
 
+/// Custom deserializer for optional fields that can be number or string
+fn deserialize_flexible_string_option<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrInt {
+        String(String),
+        Int(i64),
+        Float(f64),
+    }
+
+    Option::<StringOrInt>::deserialize(deserializer).map(|opt| {
+        opt.map(|v| match v {
+            StringOrInt::String(s) => s,
+            StringOrInt::Int(i) => i.to_string(),
+            StringOrInt::Float(f) => f.to_string(),
+        })
+    })
+}
+
 /// Hospital information
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hospital {
-    #[serde(deserialize_with = "deserialize_flexible_string")]
+    #[serde(deserialize_with = "deserialize_flexible_string", alias = "id")]
     pub unit_id: String,
+    #[serde(alias = "name")]
     pub unit_name: String,
 }
 
@@ -230,6 +253,24 @@ pub struct Department {
     #[serde(deserialize_with = "deserialize_flexible_string")]
     pub dep_id: String,
     pub dep_name: String,
+    #[serde(default)]
+    pub childs: Vec<Department>,
+    // API also returns these duplicate fields, capture them to avoid parse errors
+    #[serde(default, deserialize_with = "deserialize_flexible_string_option")]
+    id: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+}
+
+/// Department category from API response (top-level structure)
+/// The API returns categories with nested departments: [{pubcat, yuyue_num, childs: [...departments]}]
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DepartmentCategory {
+    #[serde(default)]
+    pub pubcat: String,
+    #[serde(default)]
+    pub yuyue_num: i32,
     #[serde(default)]
     pub childs: Vec<Department>,
 }
@@ -245,7 +286,7 @@ pub struct LogEntry {
 /// Schedule slot information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduleSlot {
-    #[serde(deserialize_with = "deserialize_flexible_string")]
+    #[serde(deserialize_with = "deserialize_flexible_string", alias = "id")]
     pub schedule_id: String,
     pub time_type: String,
     pub time_type_desc: String,

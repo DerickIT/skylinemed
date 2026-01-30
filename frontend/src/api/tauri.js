@@ -16,7 +16,7 @@ export const GetCities = () => invoke('get_cities');
 
 export const GetHospitalsByCity = (cityId) => invoke('get_hospitals_by_city', { cityId: cityId });
 
-export const GetDepsByUnit = (unitId) => invoke('get_deps_by_unit', { unitId: unitId });
+export const GetDepsByUnit = (unitId, cityPinyin) => invoke('get_deps_by_unit', { unitId: unitId, cityPinyin: cityPinyin || '' });
 
 export const GetSchedule = (unitId, depId, date) => invoke('get_schedule', {
     unitId: unitId,

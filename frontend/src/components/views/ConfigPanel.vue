@@ -4,7 +4,7 @@ import { useHospitalData } from '../../composables/useHospitalData'
 import { useAuth } from '../../composables/useAuth'
 import { useGrabTask } from '../../composables/useGrabTask'
 import { useLogger } from '../../composables/useLogger'
-import { GetTicketDetail } from '../../../wailsjs/go/main/App'
+import { GetTicketDetail } from '../../api/tauri' // Corrected import path
 import GlassCard from '../ui/GlassCard.vue'
 import NeonButton from '../ui/NeonButton.vue'
 import StatusBadge from '../ui/StatusBadge.vue'
@@ -243,220 +243,256 @@ const clearPreciseSelection = () => {
 </script>
 
 <template>
-  <div class="space-y-6 pb-20">
-    <!-- Main Config Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
+  <div class="space-y-10 pb-24">
+    <!-- Header Section -->
+    <header class="flex flex-col gap-1">
+      <h1 class="text-3xl font-bold tracking-tight text-slate-900">配置中心</h1>
+      <p class="text-slate-500 text-sm">精确配置您的抢号目标，Skyline 引擎将全速为您护航。</p>
+    </header>
 
-       <!-- Location & Hospital -->
-       <GlassCard title="医院设置" className="relative z-30">
-          <div class="space-y-4">
-             <Combobox
-                label="城市"
-                v-model="selectedCity"
-                :options="cities"
-                key-field="cityId"
-                label-field="name"
-                placeholder="搜索城市..."
-                :loading="loadingCities"
-                :disabled="!loginChecked || !loggedIn"
-             />
-             
-             <Combobox
-                label="医院"
-                v-model="unitId"
-                :options="hospitals"
-                key-field="id"
-                label-field="name"
-                placeholder="请选择或搜索医院..."
-                :loading="loadingHospitals"
-                :disabled="!loginChecked || !loggedIn || !selectedCity"
-             />
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 relative items-start">
 
-             <Combobox
-                label="科室"
-                v-model="depId"
-                :options="deps"
-                key-field="id"
-                label-field="name"
-                placeholder="请选择或搜索科室..."
-                :loading="loadingDeps"
-                :disabled="!loginChecked || !loggedIn || !unitId"
-             />
-          </div>
-       </GlassCard>
+       <!-- Left Column: Core Settings -->
+       <div class="lg:col-span-4 space-y-8 sticky top-6">
+          <GlassCard title="挂号目标">
+             <div class="space-y-6">
+                <Combobox
+                   label="所在城市"
+                   v-model="selectedCity"
+                   :options="cities"
+                   key-field="cityId"
+                   label-field="name"
+                   placeholder="搜索城市..."
+                   :loading="loadingCities"
+                   :disabled="!loginChecked || !loggedIn"
+                />
+                
+                <Combobox
+                   label="目标医院"
+                   v-model="unitId"
+                   :options="hospitals"
+                   key-field="id"
+                   label-field="name"
+                   placeholder="请选择或搜索医院..."
+                   :loading="loadingHospitals"
+                   :disabled="!loginChecked || !loggedIn || !selectedCity"
+                />
 
-       <!-- Patient & Dates -->
-       <GlassCard title="就诊信息" className="relative z-20">
-          <div class="space-y-4">
-             <div>
-                <label class="block text-xs text-slate-400 mb-1.5 uppercase">就诊人</label>
-                <select v-model="memberId" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none">
-                   <option v-if="!loggedIn" value="">请先登录</option>
-                   <option v-else-if="members.length === 0" value="">无就诊人</option>
-                   <option v-for="m in members" :key="m.id" :value="m.id">{{ m.name }} {{ m.certified ? '(实名)' : '' }}</option>
-                </select>
+                <Combobox
+                   label="目标科室"
+                   v-model="depId"
+                   :options="deps"
+                   key-field="id"
+                   label-field="name"
+                   placeholder="请选择或搜索科室..."
+                   :loading="loadingDeps"
+                   :disabled="!loginChecked || !loggedIn || !unitId"
+                />
              </div>
+          </GlassCard>
 
-             <div class="pt-2 border-t border-white/5">
-                <label class="block text-xs text-slate-400 mb-1.5 uppercase">日期 (单选)</label>
-                <div class="flex gap-2 mb-2">
-                   <input type="date" v-model="dateInput" class="glass-input flex-1 op-calendar" />
-                   <NeonButton size="sm" variant="ghost" @click="handleClearDate" :disabled="targetDates.length === 0">清空</NeonButton>
+          <GlassCard title="就诊身份">
+             <div class="space-y-6">
+                <div>
+                   <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">预约人信息</label>
+                   <div class="relative group">
+                      <select v-model="memberId" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none hover:bg-white transition-all appearance-none text-slate-700 font-medium">
+                         <option v-if="!loggedIn" value="">请先登录账号</option>
+                         <option v-else-if="members.length === 0" value="">未找到就诊人信息</option>
+                         <option v-for="m in members" :key="m.id" :value="m.id">{{ m.name }} {{ m.certified ? ' (已实名)' : '' }}</option>
+                      </select>
+                      <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 transition-transform group-hover:translate-y-[-40%] group-hover:scale-110">
+                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                      </div>
+                   </div>
                 </div>
-                <div class="text-xs text-slate-500">
-                   当前选择：{{ targetDates[0] || '未选择' }}
+
+                <div class="pt-6 border-t border-slate-100">
+                   <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">首选预约日期</label>
+                   <div class="flex gap-3">
+                      <input type="date" v-model="dateInput" class="glass-input flex-1 op-calendar cursor-pointer" />
+                      <NeonButton size="sm" variant="ghost" @click="handleClearDate" :disabled="targetDates.length === 0" class="!rounded-2xl">
+                         Reset
+                      </NeonButton>
+                   </div>
+                   <div v-if="targetDates.length > 0" class="mt-3 flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-100 w-fit">
+                      <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                      <span class="text-[11px] font-bold text-blue-600">已选: {{ targetDates[0] }}</span>
+                   </div>
                 </div>
              </div>
-          </div>
-       </GlassCard>
+          </GlassCard>
+       </div>
 
-       <!-- Submit Settings -->
-       <GlassCard title="提交设置" className="lg:col-span-2 relative z-10">
-          <div class="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
-             <div>
-                <div class="text-sm text-slate-200">代理提交</div>
-                <div class="text-xs text-slate-500">仅在提交过频时使用代理重试</div>
-             </div>
-             <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" v-model="proxySubmitEnabled" class="sr-only peer" />
-                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500/50 rounded-full peer peer-checked:bg-emerald-500/70 transition-colors"></div>
-                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-             </label>
-          </div>
-          <div class="mt-2 text-[11px] text-slate-500">
-             关闭后提交仅走本地 IP，可能更容易触发“过于频繁”
-          </div>
-       </GlassCard>
-       
-       <!-- Doctor Schedule Check (Optional) -->
-       <GlassCard title="排班查询 (可选)" className="lg:col-span-2 relative z-10">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between p-1">
-             <div class="flex-1 w-full sm:w-auto">
-                <label class="block text-xs text-slate-400 mb-1.5">查询日期</label>
-                <input type="date" v-model="checkScheduleDate" class="glass-input w-full" />
-             </div>
-             <div class="w-full sm:w-40">
-                <label class="block text-xs text-slate-400 mb-1.5">医生范围(天)</label>
-                <input type="number" v-model="doctorRangeDays" min="0" max="30" class="glass-input w-full" />
-             </div>
-             <NeonButton
-               @click="handleBuildDoctorPool"
-               :loading="loadingDoctorPool || loadingDoctors"
-               :disabled="!loginChecked || !loggedIn || !unitId || !depId || !checkScheduleDate"
-             >
-                生成候选医生
-             </NeonButton>
-          </div>
+       <!-- Right Column: Precise Control -->
+       <div class="lg:col-span-8 space-y-8">
           
-          <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-             <div class="text-xs text-slate-500">
-                选择医生/时段即启用精细抢号；未选择则按模糊抢号
-             </div>
-             <div class="flex items-center gap-2">
-                <StatusBadge :variant="hasPreciseSelection ? 'success' : 'neutral'" dot>
-                   {{ hasPreciseSelection ? '精细抢号' : '模糊抢号' }}
-                </StatusBadge>
-                <button
-                  type="button"
-                  class="text-[10px] text-slate-500 hover:text-slate-200 transition-colors"
-                  @click="clearPreciseSelection"
-                  :disabled="!hasPreciseSelection"
-                >
-                  清空精细条件
-                </button>
-             </div>
-          </div>
-
-          <div v-if="doctorPool.length > 0" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-60 overflow-y-auto custom-scrollbar p-1">
-             <div 
-               v-for="doc in doctorPool" 
-               :key="doc.id"
-               @click="doctorId = doc.id"
-               :class="['p-3 rounded-lg border cursor-pointer transition-all', doctorId === doc.id ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-white/5 border-white/5 hover:border-white/20']"
-             >
-                <div class="flex justify-between items-start">
-                   <span class="font-medium text-sm text-slate-200">{{ doc.name }}</span>
-                   <span class="text-xs text-emerald-400">¥{{ doc.fee }}</span>
+          <GlassCard title="提交策略优化">
+             <div class="flex items-center justify-between p-6 glass-panel rounded-3xl border border-slate-200 hover:border-blue-200 transition-all">
+                <div class="flex items-center gap-5">
+                   <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                      <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                   </div>
+                   <div>
+                      <div class="text-slate-900 font-bold tracking-tight">智能代理链路 (Smart Cloud Proxy)</div>
+                      <div class="text-[11px] text-slate-500 max-w-sm">启用后，系统将在检测到 IP 压制时通过天际高匿名节点重试，大幅提升高频波峰下的成功率。</div>
+                   </div>
                 </div>
-                <div class="text-xs text-slate-500 mt-1">
-                   排班天数: {{ doc.scheduleDays }} · 排班场次: {{ doc.scheduleSlots }}
-                </div>
-                <div class="text-xs text-slate-500 mt-1">
-                   最近排班: {{ doc.latestDate || '-' }}
-                </div>
-                <div v-if="doctorScheduleMap.get(doc.id)" class="text-xs text-emerald-400 mt-1">
-                   当日余号: {{ doctorScheduleMap.get(doc.id)?.left || 0 }}
-                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                   <input type="checkbox" v-model="proxySubmitEnabled" class="sr-only peer" />
+                   <div class="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 transition-all shadow-inner"></div>
+                   <div class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-7 shadow-sm"></div>
+                </label>
              </div>
-          </div>
-          <div v-else-if="!loadingDoctorPool && checkScheduleDate" class="mt-4 text-center text-xs text-slate-500">
-             暂无候选医生或未查询
-          </div>
+          </GlassCard>
 
-          <div v-if="doctorId && selectedSchedules.length > 0" class="mt-5">
-             <label class="block text-xs text-slate-400 mb-2">选择时段</label>
-             <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="slot in selectedSchedules"
-                  :key="slot.schedule_id || slot.time_type"
-                  type="button"
-                  @click="handleSelectSchedule(slot)"
-                  :class="[
-                    'px-3 py-1.5 rounded-lg text-xs border transition-colors',
-                    String(selectedScheduleId) === String(slot.schedule_id)
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-200'
-                  ]"
-                >
-                  {{ slot.time_type_desc || (slot.time_type === 'am' ? '上午' : '下午') }}
-                  <span class="ml-1 text-slate-500">余{{ slot.left_num || 0 }}</span>
-                </button>
-             </div>
-          </div>
-          <div v-else-if="doctorId" class="mt-3 text-xs text-slate-500">
-             当前日期暂无该医生排班，无法选择时段
-          </div>
+          <GlassCard title="排班深度分析">
+             <div class="space-y-8">
+                <!-- Data Source Selection -->
+                <div class="flex flex-col gap-5 md:flex-row md:items-end p-1">
+                   <div class="flex-1 space-y-3">
+                      <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest">扫描目标日期</label>
+                      <input type="date" v-model="checkScheduleDate" class="glass-input w-full cursor-pointer h-12" />
+                   </div>
+                   <div class="w-full md:w-32 space-y-3">
+                      <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest">预测半径 (天)</label>
+                      <input type="number" v-model="doctorRangeDays" min="0" max="30" class="glass-input w-full h-12" />
+                   </div>
+                   <NeonButton
+                     @click="handleBuildDoctorPool"
+                     :loading="loadingDoctorPool || loadingDoctors"
+                     :disabled="!loginChecked || !loggedIn || !unitId || !depId || !checkScheduleDate"
+                     size="lg"
+                     class="h-12 !rounded-xl"
+                   >
+                      扫描候选池
+                   </NeonButton>
+                </div>
+                
+                <div class="flex items-center justify-between py-4 border-y border-slate-100">
+                   <div class="flex items-center gap-3">
+                      <StatusBadge :variant="hasPreciseSelection ? 'success' : 'neutral'" dot size="sm">
+                         {{ hasPreciseSelection ? '已激活精细化指令' : '全自动模糊匹配' }}
+                      </StatusBadge>
+                      <span class="text-slate-500 text-[10px] font-medium italic">模式自动切换</span>
+                   </div>
+                   <button
+                     v-if="hasPreciseSelection"
+                     type="button"
+                     class="px-3 py-1 bg-slate-100 border border-slate-200 rounded-full text-[10px] text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all"
+                     @click="clearPreciseSelection"
+                   >
+                     Reset AI Instructions
+                   </button>
+                </div>
 
-          <div v-if="selectedScheduleId" class="mt-5">
-             <div class="flex items-center justify-between">
-                <label class="block text-xs text-slate-400">具体时段</label>
-                <button type="button" class="text-[10px] text-slate-500 hover:text-slate-200" @click="clearPreferredHours">
-                   清空
-                </button>
-             </div>
-             <div v-if="timeSlotsLoading" class="mt-2 text-xs text-slate-500">正在加载时段...</div>
-             <div v-else-if="timeSlots.length > 0" class="mt-3 flex flex-wrap gap-2">
-                <button
-                  v-for="slot in timeSlots"
-                  :key="slot.value || slot.name"
-                  type="button"
-                  @click="togglePreferredHour(slot.name)"
-                  :class="[
-                    'px-3 py-1.5 rounded-lg text-xs border transition-colors',
-                    preferredHours.includes(slot.name)
-                      ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-200'
-                  ]"
-                >
-                  {{ slot.name }}
-                </button>
-             </div>
-             <div v-else class="mt-2 text-xs text-slate-500">暂无可选时段</div>
-          </div>
-          <div v-if="doctorId" class="mt-4">
-             <label class="block text-[10px] text-slate-500 mb-1">手动添加时段 (如 08:30-09:00)</label>
-             <div class="flex gap-2">
-                <input type="text" v-model="manualTimeInput" class="glass-input flex-1 py-1 text-sm" placeholder="08:30-09:00" />
-                <NeonButton size="sm" variant="ghost" @click="addManualPreferredHour" :disabled="!manualTimeInput">
-                   添加
-                </NeonButton>
-                <NeonButton size="sm" variant="ghost" @click="clearPreferredHours" :disabled="preferredHours.length === 0">
-                   清空
-                </NeonButton>
-             </div>
-          </div>
-       </GlassCard>
+                <!-- Doctor Pool -->
+                <div v-if="doctorPool.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                   <div 
+                     v-for="doc in doctorPool" 
+                     :key="doc.id"
+                     @click="doctorId = doc.id"
+                     :class="['p-5 rounded-3xl border cursor-pointer transition-all relative overflow-hidden group', 
+                       doctorId === doc.id ? 'bg-blue-50 border-blue-200 shadow-xl shadow-blue-500/5' : 'bg-white border-slate-200 hover:border-blue-200 hover:shadow-lg hover:shadow-slate-200/50']"
+                   >
+                      <div class="flex justify-between items-center relative z-10">
+                         <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200 group-hover:scale-110 transition-transform">
+                               {{ doc.name?.charAt(0) }}
+                            </div>
+                            <div>
+                               <h5 class="font-bold text-slate-900">{{ doc.name }}</h5>
+                               <p class="text-[10px] text-slate-500 font-medium">挂号费: <span class="text-emerald-600">¥{{ doc.fee }}</span></p>
+                            </div>
+                         </div>
+                         <div v-if="doctorScheduleMap.get(doc.id)?.left > 0" class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[9px] font-black border border-emerald-100">
+                            余号: {{ doctorScheduleMap.get(doc.id)?.left }}
+                         </div>
+                      </div>
+                      <div class="mt-4 flex gap-4 text-[10px] text-slate-400 font-semibold uppercase tracking-wider opacity-80 relative z-10">
+                         <span>排班: {{ doc.scheduleSlots }} 场</span>
+                         <span>最新: {{ doc.latestDate?.split('-').slice(1).join('/') || '-' }}</span>
+                      </div>
+                      <!-- Decorative background accent -->
+                      <div class="absolute -right-6 -bottom-6 w-16 h-16 bg-blue-500/5 blur-2xl rounded-full"></div>
+                   </div>
+                </div>
+                <div v-else-if="!loadingDoctorPool && checkScheduleDate" class="py-12 flex flex-col items-center justify-center space-y-3 opacity-40">
+                   <svg class="w-12 h-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                   <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">当前无查询结果</p>
+                </div>
 
+                <!-- Schedule Selection -->
+                <Transition name="fade-slide">
+                   <div v-if="doctorId && selectedSchedules.length > 0" class="space-y-4 pt-4 border-t border-slate-100">
+                      <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest">选择锁定场次</label>
+                      <div class="flex flex-wrap gap-3">
+                         <button
+                           v-for="slot in selectedSchedules"
+                           :key="slot.schedule_id || slot.time_type"
+                           type="button"
+                           @click="handleSelectSchedule(slot)"
+                           :class="[
+                             'px-5 py-3 rounded-2xl text-xs font-bold border transition-all active:scale-95',
+                             String(selectedScheduleId) === String(slot.schedule_id)
+                               ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/30'
+                               : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:border-blue-300 hover:shadow-md hover:shadow-slate-200/50'
+                           ]"
+                         >
+                           {{ slot.time_type_desc || (slot.time_type === 'am' ? '上午' : '下午') }}
+                           <span class="ml-2 opacity-60 text-[10px]">余{{ slot.left_num || 0 }}</span>
+                         </button>
+                      </div>
+                   </div>
+                </Transition>
+
+                <!-- Time Filter -->
+                <Transition name="fade-slide">
+                   <div v-if="selectedScheduleId" class="space-y-4 pt-4 border-t border-slate-100">
+                      <div class="flex items-center justify-between">
+                         <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest">精细化时段过滤</label>
+                         <button v-if="preferredHours.length > 0" type="button" class="text-[10px] font-bold text-red-500 hover:text-red-400 uppercase tracking-widest transition-all" @click="clearPreferredHours">
+                            CLEAR ALL
+                         </button>
+                      </div>
+                      
+                      <div v-if="timeSlotsLoading" class="p-6 bg-slate-50 animate-pulse rounded-2xl border border-slate-200 flex items-center justify-center text-[11px] text-slate-400 font-bold uppercase tracking-widest">
+                         Analyzing Time Slots...
+                      </div>
+                      <div v-else-if="timeSlots.length > 0" class="flex flex-wrap gap-2">
+                         <button
+                           v-for="slot in timeSlots"
+                           :key="slot.value || slot.name"
+                           type="button"
+                           @click="togglePreferredHour(slot.name)"
+                           :class="[
+                             'px-4 py-2.5 rounded-xl text-[11px] font-bold border transition-all active:scale-95',
+                             preferredHours.includes(slot.name)
+                               ? 'bg-emerald-50 border-emerald-200 text-emerald-600 shadow-sm'
+                               : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:border-blue-300'
+                           ]"
+                         >
+                           {{ slot.name }}
+                         </button>
+                      </div>
+                      <div v-else class="text-center py-6 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">该场次暂无细分时段数据</div>
+
+                      <!-- Manual Entry -->
+                      <div v-if="doctorId" class="pt-4 flex flex-col gap-3">
+                         <p class="text-[9px] text-slate-400 font-black uppercase tracking-tighter">手动补充特定时段 (E.G. 09:00 - 09:30)</p>
+                         <div class="flex gap-2">
+                            <input type="text" v-model="manualTimeInput" class="glass-input flex-1 py-1.5 text-xs !rounded-2xl" placeholder="请输入时段描述..." />
+                            <NeonButton size="sm" variant="ghost" @click="addManualPreferredHour" :disabled="!manualTimeInput" class="!px-6 !rounded-2xl">
+                               ADD
+                            </NeonButton>
+                         </div>
+                      </div>
+                   </div>
+                </Transition>
+             </div>
+          </GlassCard>
+
+       </div>
     </div>
   </div>
 </template>
@@ -464,5 +500,13 @@ const clearPreciseSelection = () => {
 <style scoped>
 .op-calendar {
   color-scheme: dark;
+}
+
+.fade-slide-enter-active, .fade-slide-leave-active {
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.fade-slide-enter-from, .fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 </style>

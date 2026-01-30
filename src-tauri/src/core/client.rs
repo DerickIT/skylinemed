@@ -14,7 +14,7 @@ use url::Url;
 
 use super::cookies::{has_access_hash, load_cookie_file, save_cookie_file, unique_strings};
 use super::errors::{AppError, AppResult};
-use super::types::{CookieRecord, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital, Department};
+use super::types::{CookieRecord, DepartmentCategory, DoctorSchedule, Member, ScheduleSlot, SubmitOrderResult, TicketDetail, TimeSlot, AddressOption, Hospital};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -149,15 +149,12 @@ impl HealthClient {
         headers.insert(USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
         headers.insert(ACCEPT, HeaderValue::from_static("application/json, text/javascript, */*; q=0.01"));
         headers.insert("Accept-Language", HeaderValue::from_static("zh-CN,zh;q=0.9,en;q=0.8"));
-        // headers.insert("Accept-Encoding", HeaderValue::from_static("gzip, deflate, br")); // Checked: reqwest adds this automatically
-        headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
         headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("empty"));
         headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("cors"));
         headers.insert("Sec-Fetch-Site", HeaderValue::from_static("same-origin"));
         headers.insert("sec-ch-ua", HeaderValue::from_static("\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\""));
         headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
         headers.insert("sec-ch-ua-platform", HeaderValue::from_static("\"Windows\""));
-        headers.insert("DNT", HeaderValue::from_static("1"));
         headers
     }
 
@@ -168,10 +165,20 @@ impl HealthClient {
         }
 
         // Try to access user page
+        let mut headers = Self::default_headers();
+        headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
+        // For page requests, Accept should include html
+        headers.insert(ACCEPT, HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
+        headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("document"));
+        headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("navigate"));
+        headers.insert("Sec-Fetch-Site", HeaderValue::from_static("none")); // Initial navigation
+        headers.insert("Sec-Fetch-User", HeaderValue::from_static("?1"));
+        headers.insert("Upgrade-Insecure-Requests", HeaderValue::from_static("1"));
+
         let result = self
             .client
             .get("https://user.91160.com/user/index.html")
-            .headers(Self::default_headers())
+            .headers(headers)
             .send()
             .await;
 
@@ -189,6 +196,7 @@ impl HealthClient {
         let city = if city_id.is_empty() { "5" } else { city_id };
 
         let mut headers = Self::default_headers();
+        headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8"));
         headers.insert(REFERER, HeaderValue::from_static("https://www.91160.com/"));
         headers.insert(ORIGIN, HeaderValue::from_static("https://www.91160.com"));
@@ -207,31 +215,72 @@ impl HealthClient {
     }
 
     /// Get departments by unit
-    pub async fn get_deps_by_unit(&self, unit_id: &str) -> AppResult<Vec<Department>> {
+    /// city_pinyin is used to construct the correct subdomain (e.g., "sz" -> "sz.91160.com")
+    pub async fn get_deps_by_unit(&self, unit_id: &str, city_pinyin: &str) -> AppResult<Vec<DepartmentCategory>> {
+        // Use city pinyin as subdomain, fallback to "www" if empty
+        let subdomain = if city_pinyin.is_empty() { "www" } else { city_pinyin };
+        let url = format!("https://{}.91160.com/ajax/getdepbyunit.html", subdomain);
+        
+        println!(">>> [get_deps_by_unit] Request URL: {}", url);
+        println!(">>> [get_deps_by_unit] Request body: keyValue={}", unit_id);
+        
         let mut headers = Self::default_headers();
+        headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8"));
-        headers.insert(REFERER, HeaderValue::from_static("https://www.91160.com/"));
-        headers.insert(ORIGIN, HeaderValue::from_static("https://www.91160.com"));
+        
+        // Dynamic Referer and Origin based on subdomain
+        let referer = format!("https://{}.91160.com/", subdomain);
+        let origin = format!("https://{}.91160.com", subdomain);
+        headers.insert(REFERER, HeaderValue::from_str(&referer).unwrap_or(HeaderValue::from_static("https://www.91160.com/")));
+        headers.insert(ORIGIN, HeaderValue::from_str(&origin).unwrap_or(HeaderValue::from_static("https://www.91160.com")));
 
         let resp = self
             .client
-            .post("https://www.91160.com/ajax/getdepbyunit.html")
+            .post(&url)
             .headers(headers)
             .form(&[("keyValue", unit_id)])
             .send()
             .await?;
 
+        let status = resp.status();
+        println!(">>> [get_deps_by_unit] Response status: {}", status);
+        
         let text = resp.text().await?;
-        let data: Vec<Department> = serde_json::from_str(&text)?;
-        Ok(data)
+        // Print first 500 chars of response for debugging
+        let preview = if text.len() > 500 { &text[..500] } else { &text };
+        println!(">>> [get_deps_by_unit] Response body (preview): {}", preview);
+        
+        // API returns: [{pubcat, yuyue_num, childs: [departments]}]
+        // We return the raw category structure so frontend can handle hierarchy
+        match serde_json::from_str::<Vec<DepartmentCategory>>(&text) {
+            Ok(categories) => {
+                println!(">>> [get_deps_by_unit] Parsed {} categories successfully", categories.len());
+                Ok(categories)
+            }
+            Err(e) => {
+                println!(">>> [get_deps_by_unit] JSON parse error: {}", e);
+                println!(">>> [get_deps_by_unit] Full response: {}", text);
+                Err(AppError::JsonError(e))
+            }
+        }
     }
 
     /// Get members (patients)
     pub async fn get_members(&self) -> AppResult<Vec<Member>> {
+        let mut headers = Self::default_headers();
+        // Page request - no XMLHttpRequest
+        headers.insert(ACCEPT, HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
+        headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("document"));
+        headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("navigate"));
+        headers.insert("Sec-Fetch-Site", HeaderValue::from_static("same-origin"));
+        headers.insert("Sec-Fetch-User", HeaderValue::from_static("?1"));
+        headers.insert("Upgrade-Insecure-Requests", HeaderValue::from_static("1"));
+        headers.insert(REFERER, HeaderValue::from_static("https://user.91160.com/user/index.html"));
+
         let resp = self
             .client
             .get("https://user.91160.com/member.html")
-            .headers(Self::default_headers())
+            .headers(headers)
             .send()
             .await?;
 
@@ -309,8 +358,12 @@ impl HealthClient {
             );
 
             let mut headers = Self::default_headers();
-            headers.insert(ORIGIN, HeaderValue::from_static("https://www.91160.com"));
-            headers.insert(REFERER, HeaderValue::from_static("https://www.91160.com/"));
+            headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
+            headers.insert("Sec-Fetch-Site", HeaderValue::from_static("same-site"));
+            let referer = format!("https://www.91160.com/guahao/ystep1/uid-{}/depid-{}.html", unit_id, dep_id);
+            if let Ok(v) = HeaderValue::from_str(&referer) {
+                headers.insert(REFERER, v);
+            }
 
             let resp = match self.client.get(&url).headers(headers).send().await {
                 Ok(r) => r,
@@ -603,6 +656,11 @@ impl HealthClient {
         let mut headers = Self::default_headers();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"));
         headers.insert(ORIGIN, HeaderValue::from_static("https://www.91160.com"));
+        headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("document"));
+        headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("navigate"));
+        headers.insert("Sec-Fetch-Site", HeaderValue::from_static("same-origin"));
+        headers.insert("Sec-Fetch-User", HeaderValue::from_static("?1"));
+        headers.insert("Upgrade-Insecure-Requests", HeaderValue::from_static("1"));
         
         let referer = format!(
             "https://www.91160.com/guahao/ystep1/uid-{}/depid-{}/schid-{}.html",
