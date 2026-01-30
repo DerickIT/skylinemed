@@ -2914,34 +2914,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "quick-doctor"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "cookie",
- "cookie_store 0.21.1",
- "directories",
- "env_logger",
- "log",
- "rand 0.8.5",
- "regex",
- "reqwest",
- "scraper",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-shell",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "url",
- "urlencoding",
-]
-
-[[package]]
 name = "quick-xml"
 version = "0.38.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3794,6 +3766,34 @@ name = "siphasher"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
+
+[[package]]
+name = "skylinemed"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "cookie",
+ "cookie_store 0.21.1",
+ "directories",
+ "env_logger",
+ "log",
+ "rand 0.8.5",
+ "regex",
+ "reqwest",
+ "scraper",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-shell",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "url",
+ "urlencoding",
+]
 
 [[package]]
 name = "slab"
