@@ -89,6 +89,7 @@ pub fn has_access_hash(records: &[CookieRecord]) -> bool {
 }
 
 /// Get cookie values by name
+#[allow(dead_code)]
 pub fn get_cookie_values(records: &[CookieRecord], name: &str) -> Vec<String> {
     records
         .iter()

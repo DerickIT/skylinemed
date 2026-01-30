@@ -31,6 +31,7 @@ struct ProxyAPIResponse {
 #[derive(Debug, Deserialize)]
 struct ProxyAPIData {
     proxies: Vec<String>,
+#[allow(dead_code)]
     count: i32,
 }
 
@@ -131,6 +132,7 @@ impl ProxyPool {
     }
 
     /// Clear proxy pool
+    #[allow(dead_code)]
     pub async fn clear(&self) {
         let mut pool = self.pool.write().await;
         pool.clear();

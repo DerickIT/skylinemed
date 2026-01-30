@@ -14,14 +14,21 @@ export const GetMembers = () => invoke('get_members');
 
 export const GetCities = () => invoke('get_cities');
 
-export const GetHospitalsByCity = (cityId) => invoke('get_hospitals_by_city', { city_id: cityId });
+export const GetHospitalsByCity = (cityId) => invoke('get_hospitals_by_city', { cityId: cityId });
 
-export const GetDepsByUnit = (unitId) => invoke('get_deps_by_unit', { unit_id: unitId });
+export const GetDepsByUnit = (unitId) => invoke('get_deps_by_unit', { unitId: unitId });
 
 export const GetSchedule = (unitId, depId, date) => invoke('get_schedule', {
-    unit_id: unitId,
-    dep_id: depId,
+    unitId: unitId,
+    depId: depId,
     date: date
+});
+
+export const GetTicketDetail = (unitId, depId, scheduleId, memberId) => invoke('get_ticket_detail', {
+    unitId: unitId,
+    depId: depId,
+    scheduleId: scheduleId,
+    memberId: memberId
 });
 
 // --- Grab Task ---

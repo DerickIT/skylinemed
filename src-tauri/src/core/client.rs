@@ -108,6 +108,7 @@ impl HealthClient {
     }
 
     /// Save cookies from current jar to file
+    #[allow(dead_code)]
     pub async fn save_cookies_from_records(&self, records: Vec<CookieRecord>) -> AppResult<()> {
         if records.is_empty() {
             return Err(AppError::ConfigError("No cookies to save".into()));
@@ -137,6 +138,7 @@ impl HealthClient {
     }
 
     /// Get last status code
+    #[allow(dead_code)]
     pub async fn last_status_code(&self) -> i32 {
         *self.last_status_code.read().await
     }
